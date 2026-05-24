@@ -3575,13 +3575,19 @@ function updateMergeUI(){
   if(activeSlots.length>=2){
     const heroes=activeSlots.map(uid=>G.heroes.find(h=>h.uid===uid)).filter(Boolean);
     if(heroes.length>=2){
-      // 预览融合结果
-      var preview=generateFusedHero(heroes);
-      resultEl.innerHTML='<div style="text-align:center"><div style="font-size:32px">'+preview.icon+'</div><div class="text-xs q-'+preview.quality+'" style="font-weight:bold">'+preview.name+'</div><div class="text-xs text-dim">'+ROLES[preview.role].icon+' '+ROLES[preview.role].name+'</div></div>';
-      var skillNames=preview.skills.map(function(s){return SKILLS[s]?SKILLS[s].icon+SKILLS[s].name:s}).join(' ');
-      previewEl.innerHTML='<span class="text-green">✓ 可融合：'+preview.icon+' '+preview.name+' ('+QUALITY_NAMES[preview.quality]+')</span>'
-        +'<br><span class="text-xs text-dim">❤️'+preview.maxHP+' ⚔️'+preview.atk+' 🛡️'+preview.def+' 🏃'+preview.spd+' 💧'+preview.maxMP+'</span>'
-        +'<br><span class="text-xs text-purple">技能：'+skillNames+'</span>';
+      // 预览融合结果（需要金手指开启 showMergeResult 才显示）
+      if(G_cheats.enabled && G_cheats.showMergeResult){
+        var preview=generateFusedHero(heroes);
+        resultEl.innerHTML='<div style="text-align:center"><div style="font-size:32px">'+preview.icon+'</div><div class="text-xs q-'+preview.quality+'" style="font-weight:bold">'+preview.name+'</div><div class="text-xs text-dim">'+ROLES[preview.role].icon+' '+ROLES[preview.role].name+'</div></div>';
+        var skillNames=preview.skills.map(function(s){return SKILLS[s]?SKILLS[s].icon+SKILLS[s].name:s}).join(' ');
+        previewEl.innerHTML='<span class="text-green">✓ 可融合：'+preview.icon+' '+preview.name+' ('+QUALITY_NAMES[preview.quality]+')</span>'
+          +'<br><span class="text-xs text-dim">❤️'+preview.maxHP+' ⚔️'+preview.atk+' 🛡️'+preview.def+' 🏃'+preview.spd+' 💧'+preview.maxMP+'</span>'
+          +'<br><span class="text-xs text-purple">技能：'+skillNames+'</span>';
+      }else{
+        // 默认隐藏结果
+        resultEl.innerHTML='<div style="text-align:center"><div style="font-size:32px">❓</div><div class="text-xs text-dim">???</div></div>';
+        previewEl.innerHTML='<span class="text-green">✓ 已选择 '+heroes.length+' 个英雄，可进行融合</span><br><span class="text-xs text-dim">（开启金手指可预览结果）</span>';
+      }
       btn.disabled=false;
     }else{
       resultEl.innerHTML='?';
@@ -3845,7 +3851,8 @@ var G_cheats = {
   godMode: false,
   infiniteMP: false,
   oneHitKill: false,
-  forceMutation: false
+  forceMutation: false,
+  showMergeResult: false  // 默认隐藏合成结果
 };
 
 function renderCheats(el){
@@ -3902,9 +3909,10 @@ function renderCheats(el){
           </div>
         </div>
         <div class="panel" style="background:rgba(155,89,182,.1);border-color:rgba(155,89,182,.3)">
-          <div class="panel-title">☣️ 融合异变</div>
+          <div class="panel-title">⚗️ 融合相关</div>
           <div class="btn-group">
             <button class="btn ${G_cheats.forceMutation?'btn-primary':''}" onclick="cheatForceMutation()">${G_cheats.forceMutation?'☣️ 强制异变[开]':'☣️ 强制异变[关]'}</button>
+            <button class="btn ${G_cheats.showMergeResult?'btn-primary':''}" onclick="cheatShowMergeResult()">${G_cheats.showMergeResult?'🔮 显示合成结果[开]':'🔮 显示合成结果[关]'}</button>
           </div>
         </div>
         <div class="panel" style="background:rgba(39,174,96,.1);border-color:rgba(39,174,96,.3)">
@@ -4002,6 +4010,16 @@ function cheatForceMutation(){
   if(!G_cheats.enabled){showToast('请先开启金手指');return;}
   G_cheats.forceMutation = !G_cheats.forceMutation;
   showToast(G_cheats.forceMutation ? '☣️ 强制异变已开启（下次融合必出异变）' : '☣️ 强制异变已关闭');
+}
+
+function cheatShowMergeResult(){
+  if(!G_cheats.enabled){showToast('请先开启金手指');return;}
+  G_cheats.showMergeResult = !G_cheats.showMergeResult;
+  showToast(G_cheats.showMergeResult ? '🔮 合成结果预览已开启' : '🔮 合成结果预览已关闭');
+  // 刷新合成页面以更新显示
+  if(document.getElementById('merge-result')){
+    updateMergeUI();
+  }
 }
 
 function cheatSkipStage(){
