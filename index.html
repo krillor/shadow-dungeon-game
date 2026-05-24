@@ -954,6 +954,9 @@ let G = {
     totalChests: 0,
     totalShrines: 0,
   },
+  // 离线挂机系统
+  lastOnlineTime: Date.now(),  // 上次在线时间
+  offlineEarnings: null,       // 待领取的离线收益
   // 竞技场状态
   arenaState:{
     dailyChallengesUsed:0,
@@ -1023,6 +1026,82 @@ function claimDailyBonus(){
   showToast('🎁 每日奖励已领取！💰'+goldR+' 🍞'+foodR+' 🪨'+stoneR+' ⛏️'+ironR);
   updateResUI();
   renderCurrentTab();
+}
+
+// ==================== 离线挂机收益系统 ====================
+function calculateTeamPower(){
+  // 计算队伍总战力
+  var power=0;
+  G.team.forEach(function(slot){
+    if(slot){
+      var h=G.heroes.find(function(x){return x.uid===slot.uid});
+      if(h){
+        power+=h.atk*2+h.def*1.5+h.maxHP*0.5+h.spd*3;
+      }
+    }
+  });
+  return Math.max(100,power);
+}
+
+function calculateOfflineEarnings(){
+  if(!G.lastOnlineTime) G.lastOnlineTime=Date.now();
+  var now=Date.now();
+  var elapsed=now-G.lastOnlineTime;
+  // 最多计算12小时
+  var maxOffline=12*60*60*1000;
+  elapsed=Math.min(elapsed,maxOffline);
+  var hours=elapsed/(60*60*1000);
+  
+  if(hours<0.1) return null; // 少于6分钟不计算
+  
+  var power=calculateTeamPower();
+  var progress=Math.max(1,G.stageProgress);
+  
+  // 每小时收益 = 战力系数 * 关卡系数
+  var goldPerHour=Math.floor(50+progress*15+power*0.1);
+  var foodPerHour=Math.floor(20+progress*5);
+  var stonePerHour=Math.floor(10+progress*3);
+  var ironPerHour=Math.floor(5+progress*1);
+  
+  return{
+    hours:hours,
+    gold:Math.floor(goldPerHour*hours),
+    food:Math.floor(foodPerHour*hours),
+    stone:Math.floor(stonePerHour*hours),
+    iron:Math.floor(ironPerHour*hours),
+    power:power
+  };
+}
+
+function claimOfflineEarnings(){
+  if(!G.offlineEarnings){
+    G.offlineEarnings=calculateOfflineEarnings();
+  }
+  if(!G.offlineEarnings) return;
+  
+  var e=G.offlineEarnings;
+  G.resources.gold=Math.min((G.resources.gold||0)+e.gold,RESOURCE_LIMITS.gold);
+  G.resources.food=Math.min((G.resources.food||0)+e.food,RESOURCE_LIMITS.food);
+  G.resources.stone=Math.min((G.resources.stone||0)+e.stone,RESOURCE_LIMITS.stone);
+  G.resources.iron=Math.min((G.resources.iron||0)+e.iron,RESOURCE_LIMITS.iron);
+  
+  showToast('💤 离线收益已领取！离线'+e.hours.toFixed(1)+'小时');
+  G.offlineEarnings=null;
+  G.lastOnlineTime=Date.now();
+  saveGame();
+  updateResUI();
+  renderCurrentTab();
+}
+
+function checkOfflineEarnings(){
+  // 检查是否有离线收益
+  var earnings=calculateOfflineEarnings();
+  if(earnings && earnings.hours>=0.1){
+    G.offlineEarnings=earnings;
+    return true;
+  }
+  G.lastOnlineTime=Date.now();
+  return false;
 }
 
 function deleteSave(){
@@ -1274,7 +1353,7 @@ function recordMonsterCodex(enemies){
 
 function getHeroStats(hero){
   let s={hp:hero.hp,maxHP:hero.maxHP,atk:hero.atk,def:hero.def,spd:hero.spd,mp:hero.mp,maxMP:hero.maxMP};
-  // 装备加成
+  // 装备加成（含强化加成）
   for(let slot of ['weapon','armor','accessory']){
     const eid=hero.equipment[slot];
     if(eid!=null){
@@ -1282,8 +1361,13 @@ function getHeroStats(hero){
       if(eq){
         const tpl=EQUIP_TEMPLATES.find(t=>t.id===eq.id);
         if(tpl){
+          const enhanceLevel=eq.enhance||0;
+          const enhanceMult=1+enhanceLevel*0.1; // 每级+10%
           for(let[k,v]of Object.entries(tpl.stats)){
-            if(s[k]!==undefined)s[k]+=v;
+            if(s[k]!==undefined){
+              const finalValue=Math.floor(v*enhanceMult);
+              s[k]+=finalValue;
+            }
           }
         }
       }
@@ -3656,7 +3740,18 @@ function renderCurrentTab(){
 function renderTown(el){
   var nextStage=getStage(G.stageProgress);
   var today=new Date().toDateString();
+  // 检查离线收益
+  var offline=calculateOfflineEarnings();
+  if(offline) G.offlineEarnings=offline;
+  
   el.innerHTML=`
+    <!-- 离线收益横幅 -->
+    ${G.offlineEarnings?`
+    <div class="daily-bonus-banner" style="cursor:pointer;background:linear-gradient(135deg,rgba(100,200,255,.15),rgba(50,150,255,.05));border-color:rgba(100,200,255,.3)" onclick="claimOfflineEarnings()">
+      <span style="font-size:16px">💤</span> 离线收益可领取！离线 ${G.offlineEarnings.hours.toFixed(1)} 小时<br>
+      <span class="text-xs">💰${G.offlineEarnings.gold} 🍞${G.offlineEarnings.food} 🪨${G.offlineEarnings.stone} ⛏️${G.offlineEarnings.iron}</span>
+    </div>
+    `:''}
     <!-- 每日奖励横幅 -->
     ${!G.dailyBonusClaimed?`
     <div class="daily-bonus-banner" style="cursor:pointer" onclick="claimDailyBonus()">
@@ -4058,11 +4153,15 @@ function renderBattle(el){
           const unlocked=s.id<=G.stageProgress;
           const cleared=s.id<G.stageProgress;
           return'<div class="stage-node '+(cleared?'cleared':'')+' '+(s.id===G.stageProgress?'current':'')+' '+(!unlocked?'locked':'')+'"'
-            +' onclick="'+(unlocked?'startBattle('+s.id+')':'')+'" title="'+s.desc+'">'
+            +' title="'+s.desc+'">'
             +'<span class="stage-icon">'+s.icon+'</span>'
             +'<span>'+(s.name.length>8?s.name.substring(0,8)+'…':s.name)+(s.isBoss?' <span class="text-gold">★'+(s.bossType==='final'?'★★':'')+'Boss</span>':'')+'</span>'
             +'<span class="text-xs text-dim">Lv.'+s.enemies[0].level+'</span>'
             +(cleared?'<span class="text-green text-xs">✓</span>':'')
+            +'<div style="display:flex;gap:4px;margin-top:4px">'
+            +(unlocked?'<button class="btn" style="font-size:10px;padding:2px 6px" onclick="event.stopPropagation();startBattle('+s.id+')">战斗</button>':'')
+            +(cleared?'<button class="btn" style="font-size:10px;padding:2px 6px;background:rgba(100,200,255,.2)" onclick="event.stopPropagation();quickClear('+s.id+')">扫荡</button>':'')
+            +'</div>'
             +'</div>';
         }).join('')}
       </div>
@@ -4087,6 +4186,63 @@ function startAutoBattle(fromStage){
 
 function startBattle(stageId){
   runBattle(stageId);
+}
+
+// ==================== 扫荡功能 ====================
+function quickClear(stageId){
+  var stage=getStage(stageId);
+  if(!stage || stageId>=G.stageProgress){
+    showToast('只能扫荡已通关的关卡！');
+    return;
+  }
+  var teamHeroes=G.team.filter(h=>h!==null);
+  if(teamHeroes.length===0){
+    showToast('请先编队！');
+    return;
+  }
+  
+  // 扫荡：直接结算奖励，跳过战斗
+  var rw=stage.rewards;
+  // 连胜加成
+  var streakBonus=1+Math.min((G.pveWinStreak||0)*0.05,0.5);
+  var finalGold=Math.floor((rw.gold||0)*streakBonus);
+  var finalFood=Math.floor((rw.food||0)*streakBonus);
+  var finalStone=Math.floor((rw.stone||0)*streakBonus);
+  var finalIron=Math.floor((rw.iron||0)*streakBonus);
+  
+  G.resources.gold=Math.min((G.resources.gold||0)+finalGold,RESOURCE_LIMITS.gold);
+  G.resources.food=Math.min((G.resources.food||0)+finalFood,RESOURCE_LIMITS.food);
+  G.resources.stone=Math.min((G.resources.stone||0)+finalStone,RESOURCE_LIMITS.stone);
+  G.resources.iron=Math.min((G.resources.iron||0)+finalIron,RESOURCE_LIMITS.iron);
+  G.resources.gems=Math.min((G.resources.gems||0)+(rw.gems||0),RESOURCE_LIMITS.gems);
+  
+  // 经验
+  teamHeroes.forEach(function(h){
+    var expBonus=1;
+    if(h.traits) h.traits.forEach(function(t){if(t.id==='tactician')expBonus+=0.20});
+    addHeroExp(h,Math.floor((rw.exp||0)*expBonus));
+  });
+  
+  // 装备掉落（扫荡掉率降低）
+  if(Math.random()<0.15+stageId*0.02){
+    var possibleDrops=EQUIP_TEMPLATES.filter(function(e){return QUALITIES.indexOf(e.quality)<=Math.min(stageId,4)});
+    if(possibleDrops.length>0){
+      var tpl=pick(possibleDrops);
+      var drop={uid:++G.heroIdCounter,id:tpl.id,heroUid:null};
+      G.equipment.push(drop);
+      recordCodex('equipment',tpl.id);
+      showToast('扫荡成功！获得 '+tpl.name);
+    }else{
+      showToast('扫荡成功！💰'+finalGold+' 🍞'+finalFood);
+    }
+  }else{
+    showToast('扫荡成功！💰'+finalGold+' 🍞'+finalFood+' 🪨'+finalStone);
+  }
+  
+  // 更新在线时间
+  G.lastOnlineTime=Date.now();
+  saveGame();
+  updateResUI();
 }
 
 function renderMerge(el){
@@ -4297,12 +4453,22 @@ function renderEquip(el){
   unequipped.forEach(eq=>{
     const tpl=EQUIP_TEMPLATES.find(t=>t.id===eq.id);
     if(!tpl)return;
-    const statsStr=Object.entries(tpl.stats).map(([k,v])=>{const icons={atk:'⚔️',def:'🛡️',hp:'❤️',mp:'💎',spd:'💨'};return(icons[k]||'')+v}).join(' ');
+    const enhanceLevel=eq.enhance||0;
+    const enhanceBonus=enhanceLevel>0?' <span class="text-blue">+'+enhanceLevel+'</span>':'';
+    const statsStr=Object.entries(tpl.stats).map(([k,v])=>{
+      const icons={atk:'⚔️',def:'🛡️',hp:'❤️',mp:'💎',spd:'💨'};
+      const bonus=enhanceLevel>0?Math.floor(v*enhanceLevel*0.1):0;
+      return(icons[k]||'')+v+(bonus>0?'<span class="text-green">+'+bonus+'</span>':'');
+    }).join(' ');
     unequippedHTML+='<div class="equip-slot quality-'+tpl.quality+'">'
       +'<span class="equip-icon">'+tpl.icon+'</span>'
-      +'<span class="equip-name q-'+tpl.quality+'">'+tpl.name+' <span class="text-dim text-xs">('+QUALITY_NAMES[tpl.quality]+')</span></span>'
+      +'<span class="equip-name q-'+tpl.quality+'">'+tpl.name+enhanceBonus+' <span class="text-dim text-xs">('+QUALITY_NAMES[tpl.quality]+')</span></span>'
       +'<span class="equip-stats">'+statsStr+'</span>'
+      +'<div style="display:flex;gap:4px">'
       +'<button class="btn btn-sm" onclick="showEquipToHero('+eq.uid+')">装备</button>'
+      +'<button class="btn btn-sm" style="background:rgba(255,215,0,.2)" onclick="enhanceEquipment('+eq.uid+')">强化</button>'
+      +'<button class="btn btn-sm btn-danger" onclick="decomposeEquipment('+eq.uid+')">分解</button>'
+      +'</div>'
       +'</div>';
   });
   let equippedHTML='';
@@ -4312,9 +4478,11 @@ function renderEquip(el){
     if(!tpl||!hero)return;
     const slotName=tpl.type==='weapon'?'武器':tpl.type==='armor'?'护甲':'饰品';
     const slotKey=tpl.type==='weapon'?'weapon':tpl.type==='armor'?'armor':'accessory';
+    const enhanceLevel=eq.enhance||0;
+    const enhanceBonus=enhanceLevel>0?' <span class="text-blue">+'+enhanceLevel+'</span>':'';
     equippedHTML+='<div class="equip-slot quality-'+tpl.quality+'">'
       +'<span class="equip-icon">'+tpl.icon+'</span>'
-      +'<span class="equip-name"><span class="q-'+tpl.quality+'">'+tpl.name+'</span> → '+hero.icon+hero.name+' <span class="text-dim text-xs">['+slotName+']</span></span>'
+      +'<span class="equip-name"><span class="q-'+tpl.quality+'">'+tpl.name+enhanceBonus+'</span> → '+hero.icon+hero.name+' <span class="text-dim text-xs">['+slotName+']</span></span>'
       +'<button class="btn btn-sm btn-danger" onclick="unequipFromHero('+eq.heroUid+',\''+slotKey+'\')">卸下</button>'
       +'</div>';
   });
@@ -4335,7 +4503,12 @@ function renderEquip(el){
     +'<button class="btn btn-primary" onclick="forgeEquipment(\'epic\')">🔨 史诗 (💰800 ⛏️40)</button>'
     +'<button class="btn btn-primary" onclick="forgeEquipment(\'legendary\')">🔨 传说 (💰2000 ⛏️100)</button>'
     +'<button class="btn btn-primary" onclick="forgeEquipment(\'mythic\')">🔨 神话 (💰5000 ⛏️250)</button>'
-    +'</div></div>';
+    +'</div>'
+    +'<div style="margin-top:12px;padding:10px;background:rgba(0,0,0,.2);border-radius:8px">'
+    +'<div style="color:var(--gold);margin-bottom:6px">💡 强化说明</div>'
+    +'<div class="text-xs text-dim">强化消耗铁矿，每级+10%属性，最高+10。分解装备返还部分铁矿。</div>'
+    +'</div>'
+    +'</div>';
 }
 
 function showEquipToHero(equipUid){
@@ -4356,6 +4529,58 @@ function showEquipToHero(equipUid){
 function unequipFromHero(heroUid,slot){
   unequipItem(heroUid,slot);
   showToast('已卸下装备');
+  renderCurrentTab();
+}
+
+// ==================== 装备强化与分解 ====================
+function enhanceEquipment(equipUid){
+  var eq=G.equipment.find(function(e){return e.uid===equipUid});
+  if(!eq){showToast('装备不存在！');return}
+  if(eq.heroUid){showToast('请先卸下装备！');return}
+  
+  var level=eq.enhance||0;
+  if(level>=10){showToast('已达到最高强化等级！');return}
+  
+  // 强化消耗：铁矿随等级递增
+  var ironCost=10+level*5;
+  var goldCost=50+level*30;
+  
+  if((G.resources.iron||0)<ironCost){showToast('铁矿不足！需要 '+ironCost+' ⛏️');return}
+  if((G.resources.gold||0)<goldCost){showToast('金币不足！需要 '+goldCost+' 💰');return}
+  
+  G.resources.iron-=ironCost;
+  G.resources.gold-=goldCost;
+  eq.enhance=level+1;
+  
+  var tpl=EQUIP_TEMPLATES.find(function(t){return t.id===eq.id});
+  showToast(tpl.name+' 强化成功！+'+(level+1));
+  saveGame();
+  updateResUI();
+  renderCurrentTab();
+}
+
+function decomposeEquipment(equipUid){
+  var eq=G.equipment.find(function(e){return e.uid===equipUid});
+  if(!eq){showToast('装备不存在！');return}
+  if(eq.heroUid){showToast('请先卸下装备！');return}
+  
+  var tpl=EQUIP_TEMPLATES.find(function(t){return t.id===eq.id});
+  if(!tpl){showToast('装备数据错误！');return}
+  
+  if(!confirm('确定要分解 '+tpl.name+' 吗？'))return;
+  
+  // 分解返还铁矿（基础返还+强化返还）
+  var qualityIdx=QUALITIES.indexOf(tpl.quality);
+  var baseIron=5+qualityIdx*10;
+  var enhanceBonus=(eq.enhance||0)*5;
+  var ironReturn=baseIron+enhanceBonus;
+  
+  G.resources.iron=Math.min((G.resources.iron||0)+ironReturn,RESOURCE_LIMITS.iron);
+  G.equipment=G.equipment.filter(function(e){return e.uid!==equipUid});
+  
+  showToast('分解成功！获得 ⛏️'+ironReturn+' 铁矿');
+  saveGame();
+  updateResUI();
   renderCurrentTab();
 }
 
