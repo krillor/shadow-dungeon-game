@@ -809,8 +809,9 @@ const BUILDING_DEFS = {
     desc:'招募新英雄，升级解锁更高品质',
     maxLevel:10,
     baseCost:{gold:200, stone:30, food:10},
-    upgradeReq:{fame:3},
-    effects:['解锁稀有英雄','解锁史诗英雄','解锁传说英雄','解锁神话英雄','提升刷新品质','降低刷新消耗','增加刷新选项','解锁觉醒英雄','解锁传说觉醒']
+    // 声望需求随等级递增（前期低后期高）
+    upgradeReqByLevel:{2:{fame:3},3:{fame:8},4:{fame:15},5:{fame:25},6:{fame:40},7:{fame:60},8:{fame:85},9:{fame:120},10:{fame:160}},
+    effects:['解锁稀有英雄','解锁史诗英雄','解锁传说英雄','解锁神话英雄','提升刷新品质','降低刷新消耗','增加刷新选项','解锁觉醒英雄','解锁传说觉醒','酒馆满级·传说概率提升']
   },
   farm:{
     name:'农场', icon:'🌾',
@@ -2746,8 +2747,10 @@ function findMergeRecipe(heroUids){
   return{recipe:{result:'__dynamic__',inheritSkills:true,lore:'英雄的融合创造了新的存在。'},usedHeroes:heroes};
 }
 
-// 异变概率（金手指可修改）
-var G_MUTATION_RATE = 0.01; // 1%
+// 异变概率配置
+var G_MUTATION_RATE = 0.30;       // 30% 异变概率
+var G_QUALITY_UP_RATE = 0.05;      // 5% 品质+1概率
+var G_MYTHIC_DIRECT_RATE = 0.01;   // 1% 直接神话概率
 
 function generateFusedHero(heroes){
   // 基于输入英雄属性即时生成新英雄
@@ -2762,8 +2765,23 @@ function generateFusedHero(heroes){
   var newQIdx=Math.min(maxQ,avgQ);
   var newQuality=QUALITIES[newQIdx];
   
-  // 2. 判定异变（1%概率，金手指可强制触发）
+  // 2. 判定特殊结果（优先级：神话 > 品质+1 > 异变 > 普通）
+  // 金手指强制异变
   var isMutation=G_cheats.forceMutation||Math.random()<G_MUTATION_RATE;
+  
+  // 1% 直接神话（最高优先级，无视当前品质）
+  var isDirectMythic=Math.random()<G_MYTHIC_DIRECT_RATE;
+  if(isDirectMythic){
+    newQuality='mythic';
+    newQIdx=QUALITIES.indexOf('mythic');
+    isMutation=true; // 神话必定异变
+  }
+  // 5% 品质+1（不超过神话）
+  else if(Math.random()<G_QUALITY_UP_RATE && newQIdx<QUALITIES.length-1){
+    newQIdx++;
+    newQuality=QUALITIES[newQIdx];
+    isMutation=true; // 品质提升必定异变
+  }
   
   // 3. 确定新职业：基于哈希从输入英雄职业中选
   var allRoles=heroes.map(function(h){return h.role});
@@ -2983,9 +3001,18 @@ function upgradeBuilding(buildingId){
   const curLevel=G.buildings[buildingId];
   if(curLevel>=def.maxLevel){showToast('已达最高等级！');return}
   
-  // 检查特殊升级条件（如酒馆需要声望）
-  if(def.upgradeReq){
-    for(let[k,v]of Object.entries(def.upgradeReq)){
+  const nextLevel=curLevel+1;
+  
+  // 检查特殊升级条件（支持固定 upgradeReq 和按等级 upgradeReqByLevel）
+  var upgradeReq=null;
+  if(def.upgradeReqByLevel && def.upgradeReqByLevel[nextLevel]){
+    upgradeReq=def.upgradeReqByLevel[nextLevel];
+  }else if(def.upgradeReq){
+    upgradeReq=def.upgradeReq;
+  }
+  
+  if(upgradeReq){
+    for(let[k,v]of Object.entries(upgradeReq)){
       if((G.resources[k]||0)<v){
         showToast(`升级需要${RESOURCE_DEFS[k]?.name||k}: ${v}`);
         return;
@@ -2999,13 +3026,15 @@ function upgradeBuilding(buildingId){
   // 扣除资源
   for(let[k,v]of Object.entries(cost))G.resources[k]-=v;
   // 扣除特殊条件资源
-  if(def.upgradeReq){
-    for(let[k,v]of Object.entries(def.upgradeReq))G.resources[k]-=v;
+  if(upgradeReq){
+    for(let[k,v]of Object.entries(upgradeReq))G.resources[k]-=v;
   }
   
   G.buildings[buildingId]++;
+  const newLevel=G.buildings[buildingId];
   updateResUI();
-  showToast(`${def.name} 升级到 ${G.buildings[buildingId]} 级！${def.effects?def.effects[G.buildings[buildingId]-1]:''}`);
+  const effectText=def.effects&&def.effects[newLevel-1]?def.effects[newLevel-1]:'';
+  showToast(`${def.name} 升级到 ${newLevel} 级！${effectText}`);
   saveGame();
   renderCurrentTab();
 }
@@ -3524,7 +3553,9 @@ function renderMerge(el){
         <div>📊 <b>品质限制</b>：融合英雄品质 ≤ 被融合最高品质</div>
         <div>🎲 <b>技能继承</b>：随机继承材料英雄的技能</div>
         <div>📈 <b>属性继承</b>：随机继承材料英雄的属性</div>
-        <div>☣️ <b>异变</b>：1%概率发生异变，属性/技能更强</div>
+        <div>☣️ <b>异变</b>：30%概率发生异变，属性/技能更强</div>
+        <div>⬆️ <b>品质提升</b>：5%概率品质+1（必定异变）</div>
+        <div>🌟 <b>神话降临</b>：1%概率直接获得神话品质（必定异变）</div>
       </div>
     </div>
     <div class="panel">
@@ -3769,12 +3800,23 @@ function renderBuildings(el){
         const maxed=level>=def.maxLevel;
         const cost=maxed?{}:getBuildingCost(id,level);
         const costStr=Object.entries(cost).map(([k,v])=>`${RESOURCE_DEFS[k]?.icon||''}${v}`).join(' ');
-        // 检查特殊升级条件
+        // 检查特殊升级条件（支持 upgradeReqByLevel）
         let reqStr='';
-        if(def.upgradeReq){
-          reqStr=Object.entries(def.upgradeReq).map(([k,v])=>`${RESOURCE_DEFS[k]?.icon||''}${v}`).join(' ');
+        let canUpReq=true;
+        if(!maxed){
+          var nextLv=level+1;
+          var ureq=null;
+          if(def.upgradeReqByLevel && def.upgradeReqByLevel[nextLv]){
+            ureq=def.upgradeReqByLevel[nextLv];
+          }else if(def.upgradeReq){
+            ureq=def.upgradeReq;
+          }
+          if(ureq){
+            reqStr=Object.entries(ureq).map(([k,v])=>`${RESOURCE_DEFS[k]?.icon||''}${v}`).join(' ');
+            canUpReq=Object.entries(ureq).every(([k,v])=>(G.resources[k]||0)>=v);
+          }
         }
-        const canUp=!maxed&&canAfford(cost)&&(!def.upgradeReq||Object.entries(def.upgradeReq).every(([k,v])=>(G.resources[k]||0)>=v));
+        const canUp=!maxed&&canAfford(cost)&&canUpReq;
         const currentEffect=def.effects&&level>0?def.effects[level-1]:'';
         const nextEffect=!maxed&&def.effects?def.effects[level]:'';
         return`<div class="building-card">
