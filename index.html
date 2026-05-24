@@ -3109,7 +3109,6 @@ async function runBattle(stageId){
   updateResUI();
   renderTeams();
   saveGame();
-  G_battleRunning=false;
   G_battlePaused=false;
   updatePauseButton();
   
@@ -3117,9 +3116,15 @@ async function runBattle(stageId){
   if(btnArea){
     if(G_autoBattle&&won){
       btnArea.innerHTML='<span class="text-gold text-sm">✅ 胜利！自动进入下一关...</span>';
-      renderCurrentTab();
-      setTimeout(function(){startBattle(G_currentStageId)},1500/G_battleSpeed);
+      // 不调用renderCurrentTab()，避免隐藏战斗面板
+      // 不设G_battleRunning=false，保持面板显示
+      updateResUI();
+      setTimeout(function(){
+        G_battleRunning=false; // 先重置，让runBattle重新初始化
+        startBattle(G_currentStageId);
+      },1500/G_battleSpeed);
     }else{
+      G_battleRunning=false;
       G_autoBattle=false;
       // 非自动战斗：显示醒目的"返回"按钮
       btnArea.innerHTML='<div style="text-align:center;padding:16px 0">'
