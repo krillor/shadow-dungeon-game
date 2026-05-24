@@ -2025,6 +2025,66 @@ function calcDamage(attacker,defender,skill=null){
   return{dmg,crit,dodged:false};
 }
 
+// ==================== MUD风格战斗描述 ====================
+const BATTLE_DESCRIPTIONS = {
+  attack: [
+    '{attacker}挥舞武器，向{target}发起猛攻！',
+    '{attacker}的攻击如暴风骤雨般袭向{target}！',
+    '{attacker}眼中闪过一丝寒光，{target}感到一阵寒意！',
+    '{attacker}大喝一声，向{target}冲去！',
+    '{attacker}抓住破绽，对{target}发动突袭！',
+  ],
+  crit: [
+    '💥 {attacker}抓住{target}的破绽，发动致命一击！',
+    '💥 {attacker}的攻击正中{target}要害！',
+    '💥 {attacker}暴喝一声，{target}被重重击中！',
+  ],
+  dodge: [
+    '{target}身形一闪，堪堪躲过了{attacker}的攻击！',
+    '{target}侧身闪避，{attacker}的攻击落空了！',
+    '{target}如同鬼魅般消失在原地，{attacker}扑了个空！',
+  ],
+  combo: [
+    '🔥 {attacker}趁势追击，发动连击！',
+    '🔥 {attacker}攻势如潮，{target}疲于招架！',
+    '🔥 {attacker}连续出招，不给{target}喘息之机！',
+  ],
+  counter: [
+    '⚡ {target}格挡后迅速反击！',
+    '⚡ {target}抓住机会，发动反击！',
+  ],
+  skill: {
+    cleave: '{attacker}旋转身体，发动旋风斩！剑气纵横，席卷全场！',
+    shield_bash: '{attacker}举起盾牌，狠狠撞向{target}！',
+    berserker: '{attacker}怒吼一声，进入狂暴状态！双目赤红，战意滔天！',
+    fireball: '{attacker}咏唱咒语，一颗炽热的火球呼啸而出！',
+    blizzard: '{attacker}挥动法杖，寒风凛冽，冰霜覆盖战场！',
+    heal: '{attacker}圣光涌动，温暖的光芒笼罩{target}！',
+    group_heal: '{attacker}高举法杖，神圣的光辉洒落，治愈众人！',
+    backstab: '{attacker}如影随形，瞬间出现在{target}身后！',
+    poison_blade: '{attacker}的利刃泛着幽绿光芒，刺向{target}！',
+    curse: '{attacker}低声吟唱诅咒咒语，{target}感到力量在流逝！',
+    life_drain: '{attacker}伸出枯瘦的手，吸取{target}的生命力！',
+  }
+};
+
+function getBattleDesc(type,attacker,target,skill){
+  var tpl='';
+  if(type==='skill'&&skill&&BATTLE_DESCRIPTIONS.skill[skill.id]){
+    tpl=BATTLE_DESCRIPTIONS.skill[skill.id];
+  }else if(BATTLE_DESCRIPTIONS[type]){
+    tpl=pick(BATTLE_DESCRIPTIONS[type]);
+  }
+  if(!tpl)return '';
+  return tpl.replace('{attacker}',attacker.icon+attacker.name).replace('{target}',target.icon+target.name);
+}
+
+// 连击追踪器
+var G_comboCount={};
+function getCombo(unit){return G_comboCount[unit.uid]||0}
+function addCombo(unit){G_comboCount[unit.uid]=(G_comboCount[unit.uid]||0)+1;return G_comboCount[unit.uid]}
+function resetCombo(unit){G_comboCount[unit.uid]=0}
+
 function getValidTarget(unit,allUnits,targetType){
   const allies=allUnits.filter(u=>u.alive&&u.isEnemy===unit.isEnemy&&u!==unit);
   const enemies=allUnits.filter(u=>u.alive&&u.isEnemy!==unit.isEnemy);
@@ -2700,12 +2760,19 @@ async function runBattle(stageId){
         const target=getValidTarget(unit,allUnits,'single_enemy');
         if(target){
           const r=calcDamage(unit,target,null);
+          // MUD风格战斗描述 + 连击系统
+          var comboNum=getCombo(unit);
           if(r.dodged){
-            log(unit.icon+' '+unit.name+' 攻击 '+target.icon+target.name+'，但被闪避了！','info');
+            log(getBattleDesc('dodge',unit,target)||unit.icon+' '+unit.name+' 攻击 '+target.icon+target.name+'，但被闪避了！','info');
             showFloat(target,'闪避!','dodge');
             recordBattleStat(target,'dodge',1);
+            resetCombo(unit);
           }else{
             let dmg=r.dmg;
+            // 连击加成：每次连击+5%伤害，最高+30%
+            if(comboNum>0){
+              dmg=Math.floor(dmg*(1+Math.min(comboNum*0.05,0.3)));
+            }
             const reflectBuff=target.buffs.find(b=>b.stat==='reflect');
             if(reflectBuff){
               const reflectDmg=Math.floor(dmg*reflectBuff.mult);
@@ -2717,13 +2784,33 @@ async function runBattle(stageId){
             }
             if(target.shield>0){const absorbed=Math.min(target.shield,dmg);target.shield-=absorbed;dmg-=absorbed;if(absorbed>0)showFloat(target,'🛡-'+absorbed,'shield-num')}
             target.hp=Math.max(0,target.hp-dmg);
-            log(unit.icon+' '+unit.name+' 攻击 '+target.icon+target.name+'，造成 '+dmg+' 点伤害'+(r.crit?' 💥暴击！':''),r.crit?'crit':'damage');
+            // MUD风格攻击描述
+            if(r.crit){
+              log(getBattleDesc('crit',unit,target),'crit');
+            }else if(comboNum>0){
+              log(getBattleDesc('combo',unit,target),'crit');
+            }else{
+              log(getBattleDesc('attack',unit,target),'damage');
+            }
+            log('  → 造成 '+dmg+' 点伤害'+(comboNum>0?' ('+(comboNum+1)+'连击)':''),r.crit?'crit':'damage');
             showFloat(target,(r.crit?'💥':'')+dmg,r.crit?'crit':'damage');
             animUnit(target,'hit',300);
             // 记录统计数据
             recordBattleStat(unit,'damage',dmg);
             recordBattleStat(target,'damageTaken',dmg);
             if(r.crit)recordBattleStat(unit,'crit',1);
+            // 连击计数
+            addCombo(unit);
+            // 反击机制：防御者有10%概率反击（守护者20%）
+            if(target.alive && Math.random()<(target.role==='guardian'?0.2:0.1)){
+              var counterDmg=Math.floor(calcDamage(target,unit,null).dmg*0.5);
+              unit.hp=Math.max(0,unit.hp-counterDmg);
+              log(getBattleDesc('counter',unit,target)+' 造成 '+counterDmg+' 点伤害！','skill');
+              showFloat(unit,'⚡反击-'+counterDmg,'damage');
+              animUnit(unit,'hit',300);
+              recordBattleStat(target,'damage',counterDmg);
+              if(unit.hp<=0){unit.alive=false;log(unit.icon+' '+unit.name+' 倒下了...','death');animUnit(unit,'dying',700)}
+            }
             if(target.hp<=0){target.alive=false;log(target.icon+' '+target.name+' 倒下了...','death');animUnit(target,'dying',700)}
           }
           updateBattleStatsBoard();
@@ -3594,19 +3681,39 @@ function renderHeroCard(h){
   const expNeed=getExpToLevel(h.level);
   const allSkills=[...h.skills,...h.bonusSkills];
   const inTeam=G.team.some(t=>t&&t.uid===h.uid);
-  return`<div class="hero-card quality-${h.quality}" data-role="${h.role}">
+  // 职业特性描述
+  const roleTraits={
+    warrior:'近战输出，擅长AOE和爆发',
+    guardian:'坦克，擅长嘲讽和护盾',
+    mage:'远程法术，高伤害AOE',
+    healer:'治疗辅助，恢复和净化',
+    assassin:'高暴击单体输出',
+    ranger:'远程物理，擅长陷阱',
+    warlock:'诅咒和吸血',
+    paladin:'圣光战士，攻守兼备'
+  };
+  // 属性解释
+  const statTips={
+    maxHP:'生命值 - 决定存活能力',
+    atk:'攻击力 - 决定伤害输出',
+    def:'防御力 - 减少受到的伤害',
+    spd:'速度 - 决定行动顺序',
+    maxMP:'魔法值 - 释放技能消耗'
+  };
+  return`<div class="hero-card quality-${h.quality}" data-role="${h.role}" onclick="showHeroDetail(${h.uid})" style="cursor:pointer">
     <div class="hero-avatar" style="background:rgba(${h.quality==='common'?'100,100,100':h.quality==='rare'?'50,100,200':h.quality==='epic'?'130,50,200':h.quality==='legendary'?'200,150,30':'200,50,50'},.15)">
       ${h.icon}
     </div>
     <div class="hero-info">
       <div class="hero-name"><span class="q-${h.quality}">${h.name}</span> ${inTeam?'<span class="text-green text-xs">[队伍中]</span>':''}</div>
       <div class="hero-meta">${role.icon} ${role.name} · ${QUALITY_NAMES[h.quality]} · Lv.${h.level} ${h.bonusSkills.length>0?'<span class="text-purple">★合成</span>':''}</div>
+      <div class="text-xs text-dim" style="margin:4px 0;padding:4px;background:rgba(0,0,0,.2);border-radius:4px">💡 ${roleTraits[h.role]||'未知职业'}</div>
       <div class="hero-stats">
-        <span class="stat-tag">❤️<b>${stats.maxHP}</b></span>
-        <span class="stat-tag">⚔️<b>${stats.atk}</b></span>
-        <span class="stat-tag">🛡️<b>${stats.def}</b></span>
-        <span class="stat-tag">💨<b>${stats.spd}</b></span>
-        <span class="stat-tag">💎<b>${stats.maxMP}</b></span>
+        <span class="stat-tag" title="${statTips.maxHP}">❤️<b>${stats.maxHP}</b></span>
+        <span class="stat-tag" title="${statTips.atk}">⚔️<b>${stats.atk}</b></span>
+        <span class="stat-tag" title="${statTips.def}">🛡️<b>${stats.def}</b></span>
+        <span class="stat-tag" title="${statTips.spd}">💨<b>${stats.spd}</b></span>
+        <span class="stat-tag" title="${statTips.maxMP}">💎<b>${stats.maxMP}</b></span>
       </div>
       <div class="bar-wrap"><div class="bar-fill" style="width:${(h.exp/expNeed)*100}%;background:var(--exp-bar)"></div></div>
       <div class="text-xs text-dim">EXP: ${h.exp}/${expNeed}</div>
@@ -3615,6 +3722,70 @@ function renderHeroCard(h){
       <div class="text-xs text-dim mt-4" style="font-style:italic">"${h.lore}"</div>
     </div>
   </div>`;
+}
+
+// 英雄详情弹窗
+function showHeroDetail(uid){
+  const h=G.heroes.find(x=>x.uid===uid);
+  if(!h)return;
+  const role=ROLES[h.role];
+  const stats=getHeroStats(h);
+  const allSkills=[...h.skills,...h.bonusSkills];
+  const roleTraits={
+    warrior:{desc:'近战输出型职业',pros:'高AOE伤害，爆发能力强',cons:'生存能力一般',tips:'适合放在队伍前排'},
+    guardian:{desc:'坦克型职业',pros:'高防御，能嘲讽保护队友',cons:'输出较低',tips:'适合作为主坦'},
+    mage:{desc:'远程法术型职业',pros:'高伤害AOE，控制能力强',cons:'脆弱，需要保护',tips:'放在后排输出'},
+    healer:{desc:'治疗辅助型职业',pros:'群体治疗，净化debuff',cons:'输出极低',tips:'必备辅助'},
+    assassin:{desc:'暴击输出型职业',pros:'高暴击，单体爆发',cons:'AOE能力弱',tips:'优先击杀敌方后排'},
+    ranger:{desc:'远程物理型职业',pros:'陷阱控制，持续输出',cons:'爆发不如刺客',tips:'适合中排位置'},
+    warlock:{desc:'诅咒控制型职业',pros:'吸血续航，debuff强',cons:'需要时间叠加',tips:'配合AOE队友'},
+    paladin:{desc:'圣光战士型职业',pros:'攻守兼备，有治疗能力',cons:'各方面都不突出',tips:'万金油角色'}
+  };
+  const rt=roleTraits[h.role]||{desc:'未知',pros:'',cons:'',tips:''};
+  const html=`
+    <div class="panel" style="max-width:500px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div style="font-size:48px">${h.icon}</div>
+        <div>
+          <div class="q-${h.quality}" style="font-size:18px;font-weight:bold">${h.name}</div>
+          <div class="text-dim">${role.icon} ${role.name} · ${QUALITY_NAMES[h.quality]} · Lv.${h.level}</div>
+        </div>
+      </div>
+      <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px;margin-bottom:12px">
+        <div style="color:var(--gold);margin-bottom:6px">📜 职业特性</div>
+        <div class="text-sm">${rt.desc}</div>
+        <div class="text-xs text-green mt-4">✅ 优势: ${rt.pros}</div>
+        <div class="text-xs text-red">❌ 劣势: ${rt.cons}</div>
+        <div class="text-xs text-blue">💡 建议: ${rt.tips}</div>
+      </div>
+      <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px;margin-bottom:12px">
+        <div style="color:var(--gold);margin-bottom:6px">📊 属性详情</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+          <div><span class="text-dim">❤️ 生命值:</span> <b>${stats.maxHP}</b> <span class="text-xs text-dim">(存活能力)</span></div>
+          <div><span class="text-dim">⚔️ 攻击力:</span> <b>${stats.atk}</b> <span class="text-xs text-dim">(伤害输出)</span></div>
+          <div><span class="text-dim">🛡️ 防御力:</span> <b>${stats.def}</b> <span class="text-xs text-dim">(减伤比例)</span></div>
+          <div><span class="text-dim">💨 速度:</span> <b>${stats.spd}</b> <span class="text-xs text-dim">(行动顺序)</span></div>
+          <div><span class="text-dim">💎 魔法值:</span> <b>${stats.maxMP}</b> <span class="text-xs text-dim">(技能消耗)</span></div>
+          <div><span class="text-dim">⭐ 经验:</span> <b>${h.exp}/${getExpToLevel(h.level)}</b></div>
+        </div>
+      </div>
+      <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px;margin-bottom:12px">
+        <div style="color:var(--gold);margin-bottom:6px">⚔️ 技能列表</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${allSkills.map(sid=>{const sk=SKILLS[sid];return sk?`<div style="background:rgba(255,255,255,.05);border-radius:6px;padding:6px 10px"><b>${sk.icon}${sk.name}</b><div class="text-xs text-dim">${sk.desc}</div></div>`:''}).join('')}
+        </div>
+      </div>
+      ${h.traits&&h.traits.length>0?`
+      <div style="background:rgba(255,215,0,.1);border-radius:8px;padding:10px;margin-bottom:12px">
+        <div style="color:var(--gold);margin-bottom:6px">🌟 特质</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${h.traits.map(t=>`<div class="trait-tag" style="padding:4px 8px">${t.icon} <b>${t.name}</b> - ${t.desc}</div>`).join('')}
+        </div>
+      </div>
+      `:''}
+      <div class="text-xs text-dim" style="font-style:italic;text-align:center">"${h.lore}"</div>
+    </div>`;
+  openModal(html);
 }
 
 function filterHeroes(role,btn){
@@ -3795,6 +3966,45 @@ function renderMerge(el){
       +'</div></div>';
   }).join('');
   
+  // 计算融合预览
+  var selectedHeroes=usedUids.filter(Boolean).map(uid=>G.heroes.find(h=>h.uid===uid)).filter(Boolean);
+  var previewHTML='';
+  if(selectedHeroes.length>=2){
+    // 品质预览
+    var qualities=selectedHeroes.map(h=>QUALITIES.indexOf(h.quality));
+    var maxQ=Math.max(...qualities);
+    var avgQ=Math.floor(qualities.reduce((a,b)=>a+b,0)/qualities.length);
+    var previewQuality=QUALITIES[Math.min(maxQ,avgQ)];
+    
+    // 技能池预览
+    var allSkills=new Set();
+    selectedHeroes.forEach(h=>{h.skills.forEach(s=>allSkills.add(s));if(h.bonusSkills)h.bonusSkills.forEach(s=>allSkills.add(s))});
+    var skillPool=Array.from(allSkills).map(sid=>SKILLS[sid]).filter(Boolean);
+    
+    // 属性范围预览
+    var avgHP=Math.floor(selectedHeroes.reduce((s,h)=>s+h.maxHP,0)/selectedHeroes.length);
+    var avgATK=Math.floor(selectedHeroes.reduce((s,h)=>s+h.atk,0)/selectedHeroes.length);
+    var avgDEF=Math.floor(selectedHeroes.reduce((s,h)=>s+h.def,0)/selectedHeroes.length);
+    
+    previewHTML=`
+      <div style="background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.3);border-radius:8px;padding:12px;margin-top:12px">
+        <div style="color:var(--gold);font-weight:bold;margin-bottom:8px">🔮 融合预览</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div><span class="text-dim">预计品质:</span> <span class="q-${previewQuality}">${QUALITY_NAMES[previewQuality]}</span> <span class="text-xs text-dim">(最高${QUALITY_NAMES[QUALITIES[maxQ]]})</span></div>
+          <div><span class="text-dim">预计属性:</span> ❤️~${avgHP} ⚔️~${avgATK} 🛡️~${avgDEF}</div>
+        </div>
+        <div style="margin-top:8px">
+          <span class="text-dim">技能池 (${skillPool.length}个):</span>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+            ${skillPool.slice(0,8).map(sk=>`<span class="skill-tag" style="font-size:10px">${sk.icon}${sk.name}</span>`).join('')}${skillPool.length>8?`<span class="text-dim text-xs">+${skillPool.length-8}个</span>`:''}
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text3)">
+          🎲 异变率: 30% | 品质+1: 5% | 神话降临: 1%
+        </div>
+      </div>`;
+  }
+  
   el.innerHTML=`
     <div class="panel">
       <div class="panel-title"><span class="icon">⚗️</span> 英雄融合</div>
@@ -3806,9 +4016,9 @@ function renderMerge(el){
         <div class="merge-arrow">→</div>
         <div class="merge-result" id="merge-result">?</div>
       </div>
-      <div id="merge-preview" class="text-dim text-sm mt-8">请选择至少2个英雄进行融合</div>
+      <div id="merge-preview" class="text-dim text-sm mt-8">${selectedHeroes.length<2?'请选择至少2个英雄进行融合':previewHTML}</div>
       <div class="btn-group mt-8">
-        <button class="btn btn-primary" id="merge-btn" onclick="doMerge()" disabled>开始融合</button>
+        <button class="btn btn-primary" id="merge-btn" onclick="doMerge()" ${selectedHeroes.length<2?'disabled':''}>开始融合</button>
         <button class="btn" onclick="clearMerge()">清空</button>
       </div>
     </div>
@@ -3817,8 +4027,8 @@ function renderMerge(el){
       <div class="text-dim text-sm" style="line-height:2">
         <div>⚗️ <b>任意融合</b>：任何2-3个英雄都可以融合，不受配方限制</div>
         <div>📊 <b>品质限制</b>：融合英雄品质 ≤ 被融合最高品质</div>
-        <div>🎲 <b>技能继承</b>：随机继承材料英雄的技能</div>
-        <div>📈 <b>属性继承</b>：随机继承材料英雄的属性</div>
+        <div>🎲 <b>技能继承</b>：随机继承材料英雄的技能（最多3个）</div>
+        <div>📈 <b>属性继承</b>：取材料英雄属性平均值，异变时+20%</div>
         <div>☣️ <b>异变</b>：30%概率发生异变，属性/技能更强</div>
         <div>⬆️ <b>品质提升</b>：5%概率品质+1（必定异变）</div>
         <div>🌟 <b>神话降临</b>：1%概率直接获得神话品质（必定异变）</div>
