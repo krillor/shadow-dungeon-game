@@ -113,6 +113,17 @@ body{background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingF
 @keyframes shieldFlash{0%{box-shadow:0 0 0 rgba(52,152,219,0)}50%{box-shadow:0 0 20px rgba(52,152,219,.6)}100%{box-shadow:0 0 0 rgba(52,152,219,0)}}
 @keyframes deathFade{0%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.05);filter:grayscale(.5) brightness(1.5)}100%{opacity:.3;transform:scale(.92);filter:grayscale(1) brightness(.5)}}
 .battle-unit.dying{animation:deathFade .6s ease forwards}
+/* 暴击特效 */
+@keyframes critFlash{0%{box-shadow:0 0 0 0 rgba(255,200,0,.8)}50%{box-shadow:0 0 25px 5px rgba(255,150,0,.9)}100%{box-shadow:0 0 0 0 rgba(255,200,0,0)}}
+.battle-unit.crit-hit{animation:critFlash .5s ease}
+/* 连胜特效 */
+@keyframes streakPulse{0%,100%{border-color:var(--gold)}50%{border-color:#ff6b00}}
+.streak-active{animation:streakPulse 1.5s ease infinite}
+/* 特质标签 */
+.trait-tag{display:inline-block;background:linear-gradient(135deg,rgba(255,215,0,.15),rgba(255,165,0,.1));border:1px solid rgba(255,215,0,.3);color:#ffd700;padding:2px 6px;border-radius:4px;font-size:9px;margin:2px}
+/* 每日奖励提示 */
+.daily-bonus-banner{background:linear-gradient(135deg,rgba(255,215,0,.1),rgba(255,165,0,.05));border:1px solid rgba(255,215,0,.3);border-radius:8px;padding:12px;text-align:center;margin-bottom:10px;animation:dailyPulse 2s ease infinite}
+@keyframes dailyPulse{0%,100%{opacity:.8}50%{opacity:1}}
 
 /* 战斗单位头像 */
 .unit-avatar-wrap{position:relative;width:44px;height:44px;margin:0 auto 4px}
@@ -923,6 +934,12 @@ let G = {
   stageProgress: 1,
   battleState: null,
   heroIdCounter: 0,
+  // PVE连胜系统
+  pveWinStreak: 0,          // 当前连胜数
+  pveMaxStreak: 0,           // 历史最高连胜
+  // 每日登录
+  lastLoginDate: '',         // 上次登录日期
+  dailyBonusClaimed: false,  // 今日是否已领取
   // 竞技场状态
   arenaState:{
     dailyChallengesUsed:0,
@@ -960,8 +977,38 @@ function loadGame(){
       G.arenaState.dailyChallengesUsed=0;
       G.arenaState.lastChallengeDate=today;
     }
+    // 每日登录检查
+    if(G.lastLoginDate!==today){
+      G.dailyBonusClaimed=false; // 新的一天，重置领取状态
+      G.lastLoginDate=today;
+    }
+    // 初始化连胜计数
+    if(G.pveWinStreak===undefined) G.pveWinStreak=0;
+    if(G.pveMaxStreak===undefined) G.pveMaxStreak=0;
     return true;
   }catch(e){console.error('读档失败',e);return false;}
+}
+
+// 每日登录奖励领取
+function claimDailyBonus(){
+  var today=new Date().toDateString();
+  if(G.dailyBonusClaimed){showToast('今日已领取过奖励！');return;}
+  // 奖励随进度提升
+  var progressed=Math.max(1,G.stageProgress);
+  var goldR=200+progressed*30;
+  var foodR=100+progressed*10;
+  var stoneR=30+progressed*5;
+  var ironR=15+progressed*3;
+  G.resources.gold=Math.min((G.resources.gold||0)+goldR, RESOURCE_LIMITS.gold);
+  G.resources.food=Math.min((G.resources.food||0)+foodR, RESOURCE_LIMITS.food);
+  G.resources.stone=Math.min((G.resources.stone||0)+stoneR, RESOURCE_LIMITS.stone);
+  G.resources.iron=Math.min((G.resources.iron||0)+ironR, RESOURCE_LIMITS.iron);
+  G.dailyBonusClaimed=true;
+  G.lastLoginDate=today;
+  saveGame();
+  showToast('🎁 每日奖励已领取！💰'+goldR+' 🍞'+foodR+' 🪨'+stoneR+' ⛏️'+ironR);
+  updateResUI();
+  renderCurrentTab();
 }
 
 function deleteSave(){
@@ -1006,6 +1053,56 @@ function showModal(title,contentHTML,buttons=[]){
 }
 function closeModal(){document.getElementById('modal-root').innerHTML=''}
 
+// ==================== 英雄特质系统 ====================
+// 每个英雄招募/合成时随机获得1-2个特质，赋予个性加成
+const HERO_TRAITS = [
+  {id:'brave',     name:'勇猛',       icon:'🦁', desc:'攻击力+8%',           stat:'atk', mult:1.08},
+  {id:'tough',     name:'坚韧',       icon:'🛡️', desc:'防御力+8%',           stat:'def', mult:1.08},
+  {id:'swift',     name:'敏捷',       icon:'💨', desc:'速度+10%',            stat:'spd', mult:1.10},
+  {id:'vital',     name:'活力',       icon:'💪', desc:'生命值+10%',          stat:'maxHP', mult:1.10},
+  {id:'wise',      name:'睿智',       icon:'🧠', desc:'MP+15%',              stat:'maxMP', mult:1.15},
+  {id:'berserker', name:'狂战士',     icon:'😡', desc:'暴击率+8%',           stat:'critRate', add:0.08},
+  {id:'nimble',    name:'灵动',       icon:'🦶', desc:'闪避率+8%',           stat:'dodgeRate', add:0.08},
+  {id:'giant',     name:'巨人血统',   icon:'🩸', desc:'生命+20%，速度-10%',  stat:'maxHP', mult:1.20, bonus:{spd:{mult:0.90}}},
+  {id:'lucky',     name:'幸运儿',     icon:'🍀', desc:'战斗奖励+15%',        stat:'rewardBonus', add:0.15},
+  {id:'vampire',   name:'吸血鬼',     icon:'🦇', desc:'攻击伤害5%吸血',      stat:'lifesteal', add:0.05},
+  {id:'tactician', name:'战术大师',   icon:'🎯', desc:'经验获取+20%',        stat:'expBonus', add:0.20},
+  {id:'ironWill',  name:'钢铁意志',   icon:'⚡', desc:'被控制时间减半',      stat:'ccResist', add:0.50},
+];
+function assignTraits(hero){
+  // 品质高的英雄获得更多特质
+  const tCount = hero.quality==='mythic'?2:hero.quality==='legendary'?2:hero.quality==='epic'?rand(1,2):rand(0,1);
+  const assigned = [];
+  const pool = [...HERO_TRAITS];
+  for(let i=0;i<tCount&&pool.length>0;i++){
+    const idx=rand(0,pool.length-1);
+    assigned.push(pool.splice(idx,1)[0]);
+  }
+  hero.traits = assigned;
+  // 应用特质对属性的影响
+  applyTraits(hero);
+}
+function applyTraits(hero){
+  if(!hero.traits) return;
+  for(const trait of hero.traits){
+    if(trait.stat && trait.mult){
+      const key=trait.stat;
+      if(hero[key]!==undefined) hero[key]=Math.floor(hero[key]*trait.mult);
+    }
+    if(trait.bonus){
+      for(const [bk,bv] of Object.entries(trait.bonus)){
+        if(hero[bk]!==undefined && bv.mult) hero[bk]=Math.floor(hero[bk]*bv.mult);
+      }
+    }
+  }
+}
+function getTraitEffect(trait){
+  if(!trait) return '';
+  // 战斗内生效的特质（不体现在属性面板）
+  if(trait.id==='lucky'||trait.id==='vampire'||trait.id==='tactician'||trait.id==='ironWill') return trait.icon+' '+trait.desc;
+  return '';
+}
+
 function updateResUI(){
   document.getElementById('res-gold').textContent=G.resources.gold;
   document.getElementById('res-gems').textContent=G.resources.gems;
@@ -1041,6 +1138,8 @@ function createHero(templateId,level=1){
   };
   hero.hp=hero.maxHP;
   hero.mp=hero.maxMP;
+  // 分配随机特质
+  assignTraits(hero);
   return hero;
 }
 
@@ -1569,6 +1668,12 @@ async function runArenaBattle(teamHeroes,opponents,difficulty){
             log(unit.icon+' '+unit.name+' 攻击 '+target.icon+target.name+'，造成 '+dmg+' 点伤害'+(r.crit?' 💥暴击！':''),r.crit?'crit':'damage');
             showFloat(target,(r.crit?'💥':'')+dmg,r.crit?'crit':'damage');
             animUnit(target,'hit',300);
+            // 暴击视觉特效
+            if(r.crit){
+              showFloat(target,'暴击!💥','crit-flash');
+              const el=document.querySelector('.battle-unit .unit[data-uid="'+target.uid+'"]');
+              if(el){el.classList.add('crit-hit');setTimeout(()=>el.classList.remove('crit-hit'),500)}
+            }
             recordBattleStat(unit,'damage',dmg);
             recordBattleStat(target,'damageTaken',dmg);
             if(r.crit)recordBattleStat(unit,'crit',1);
@@ -1882,19 +1987,25 @@ function calcDamage(attacker,defender,skill=null){
   let mult=skill?skill.mult:1.0;
   let dmg=Math.max(1,Math.floor((atk*mult-def*0.5)*(0.9+Math.random()*0.2)));
   
-  // 暴击计算（考虑职业暴击率）
+  // 暴击计算（考虑职业暴击率 + 英雄特质暴击率）
   let crit=false;
   let critRate=attackerRole&&attackerRole.critRate?attackerRole.critRate:0.1;
   if(skill&&skill.critBonus)critRate+=skill.critBonus;
+  // 英雄特质：狂战士 +8%暴击
+  if(attacker.traits) attacker.traits.forEach(t=>{if(t.id==='berserker')critRate+=0.08});
+  // 金手指模式下暴击率提升
+  if(G_cheats.enabled) critRate+=0.1;
   
   // 刺客：暗影步 - 暴击伤害+50%
   let critDmg=attackerRole&&attackerRole.critDmg?attackerRole.critDmg:1.8;
   
   if(Math.random()<critRate){dmg=Math.floor(dmg*critDmg);crit=true}
   
-  // 闪避计算（考虑职业闪避率）
+  // 闪避计算（考虑职业闪避率 + 英雄特质闪避率）
   let dodgeChance=defenderRole&&defenderRole.dodgeRate?defenderRole.dodgeRate:0.05;
   defender.buffs.forEach(b=>{if(b.stat==='dodge')dodgeChance+=0.3});
+  // 英雄特质：灵动 +8%闪避
+  if(defender.traits) defender.traits.forEach(t=>{if(t.id==='nimble')dodgeChance+=0.08});
   if(skill&&skill.alwaysHit)dodgeChance=0;
   if(Math.random()<dodgeChance)return{dmg:0,dodged:true,crit:false};
   
@@ -1903,6 +2014,13 @@ function calcDamage(attacker,defender,skill=null){
     const heal=Math.floor(dmg*0.15);
     attacker.hp=Math.min(attacker.maxHP,attacker.hp+heal);
   }
+  // 英雄特质：吸血鬼 - 造成伤害的5%吸血
+  if(attacker.traits) attacker.traits.forEach(t=>{
+    if(t.id==='vampire'){
+      const heal=Math.floor(dmg*0.05);
+      attacker.hp=Math.min(attacker.maxHP,attacker.hp+heal);
+    }
+  });
   
   return{dmg,crit,dodged:false};
 }
@@ -2633,15 +2751,33 @@ async function runBattle(stageId){
   const won=enemyUnits.every(u=>!u.alive);
   if(won){
     const rw=stage.rewards;
-    // 奖励受资源上限约束（战利品：金币 + 食物 + 石材/铁矿 + 宝石）
-    G.resources.gold=Math.min((G.resources.gold||0)+(rw.gold||0), RESOURCE_LIMITS.gold);
-    G.resources.food=Math.min((G.resources.food||0)+(rw.food||0), RESOURCE_LIMITS.food);
-    G.resources.stone=Math.min((G.resources.stone||0)+(rw.stone||0), RESOURCE_LIMITS.stone);
-    G.resources.iron=Math.min((G.resources.iron||0)+(rw.iron||0), RESOURCE_LIMITS.iron);
+    // PVE连胜奖励
+    if(stage.isBoss) G.pveWinStreak=(G.pveWinStreak||0)+1; // BOSS关才算连胜
+    if(G.pveWinStreak>G.pveMaxStreak) G.pveMaxStreak=G.pveWinStreak;
+    var streakBonus=1+Math.min(G.pveWinStreak*(G.pveWinStreak>3?0.08:0.05),0.5); // 最高50%
+    // 英雄幸运特质：战斗奖励+15%
+    var luckyBonus=1;
+    teamHeroes.forEach(h=>{if(h.traits) h.traits.forEach(t=>{if(t.id==='lucky')luckyBonus+=0.15})});
+    
+    // 奖励受资源上限约束 + 连胜加成 + 幸运加成
+    var totalBonus=streakBonus*luckyBonus;
+    var finalGold=Math.floor((rw.gold||0)*totalBonus);
+    var finalFood=Math.floor((rw.food||0)*totalBonus);
+    var finalStone=Math.floor((rw.stone||0)*totalBonus);
+    var finalIron=Math.floor((rw.iron||0)*totalBonus);
+    G.resources.gold=Math.min((G.resources.gold||0)+finalGold, RESOURCE_LIMITS.gold);
+    G.resources.food=Math.min((G.resources.food||0)+finalFood, RESOURCE_LIMITS.food);
+    G.resources.stone=Math.min((G.resources.stone||0)+finalStone, RESOURCE_LIMITS.stone);
+    G.resources.iron=Math.min((G.resources.iron||0)+finalIron, RESOURCE_LIMITS.iron);
     G.resources.gems=Math.min((G.resources.gems||0)+(rw.gems||0), RESOURCE_LIMITS.gems);
     if(stage.id>=G.stageProgress){G.stageProgress=stage.id+1}
     G_currentStageId=stage.id+1;
-    teamHeroes.forEach(h=>addHeroExp(h,rw.exp||0));
+    // 战术大师特质：经验+20%
+    teamHeroes.forEach(h=>{
+      var expBonus=1;
+      if(h.traits) h.traits.forEach(t=>{if(t.id==='tactician')expBonus+=0.20});
+      addHeroExp(h,Math.floor((rw.exp||0)*expBonus));
+    });
     let drop=null;
     if(Math.random()<0.3+stage.id*0.05){
       const possibleDrops=EQUIP_TEMPLATES.filter(e=>QUALITIES.indexOf(e.quality)<=Math.min(stage.id,4));
@@ -2652,7 +2788,11 @@ async function runBattle(stageId){
       }
     }
     log('\n📦 战利品：💰'+(rw.gold||0)+' 🍞'+(rw.food||0)+' 🪨'+(rw.stone||0)+' ⛏️'+(rw.iron||0)+(rw.gems?' 💎'+rw.gems:'')+' ⭐经验+'+(rw.exp||0)+(drop?' 🎁'+EQUIP_TEMPLATES.find(t=>t.id===drop.id).name:''),'title');
-    showToast('战斗胜利！获得 '+rw.gold+' 金币');
+    if(G.pveWinStreak>=3){
+      log('🔥 '+G.pveWinStreak+'连胜！奖励加成 +'+Math.round((streakBonus-1)*100)+'%','crit');
+    }
+    if(luckyBonus>1) log('🍀 幸运加成 +'+Math.round((luckyBonus-1)*100)+'%','info');
+    showToast('战斗胜利！'+(G.pveWinStreak>=3?G.pveWinStreak+'连胜！':''));
   }else{
     showToast('战斗失败...');
   }
@@ -3287,7 +3427,19 @@ function renderCurrentTab(){
 
 function renderTown(el){
   var nextStage=getStage(G.stageProgress);
+  var today=new Date().toDateString();
   el.innerHTML=`
+    <!-- 每日奖励横幅 -->
+    ${G.dailyBonusClaimed?`
+    <div class="daily-bonus-banner" style="opacity:0.5">
+      <span style="font-size:16px">✅</span> 今日奖励已领取 · 明天再来！
+    </div>
+    `:`
+    <div class="daily-bonus-banner" style="cursor:pointer" onclick="claimDailyBonus()">
+      <span style="font-size:16px">🎁</span> 点击领取每日登录奖励！<br>
+      <span class="text-xs text-dim">随进度提升：约${200+G.stageProgress*30}💰 ${100+G.stageProgress*10}🍞 ${30+G.stageProgress*5}🪨 ${15+G.stageProgress*3}⛏️</span>
+    </div>
+    `}
     <div class="panel">
       <div class="panel-title"><span class="icon">🏰</span> 暗影地牢</div>
       <div style="color:var(--text2);font-size:12px;line-height:1.8">
@@ -3295,6 +3447,8 @@ function renderTown(el){
         <p>你是最后的希望——一位流浪的指挥官，必须召集英雄，探索地牢，击败黑暗势力。</p>
         <p style="margin-top:8px;color:var(--gold)">当前进度：第 ${G.stageProgress-1} 章已通关（无限模式）</p>
         <p style="color:var(--text2)">下一关：${nextStage.icon+' '+nextStage.name}</p>
+        ${G.pveWinStreak>=3?`<p style="color:#ff6b00">🔥 当前PVE连胜: ${G.pveWinStreak} 连 | 最高: ${G.pveMaxStreak} 连</p>`:''}
+        ${G.pveMaxStreak>=5?`<p style="color:var(--gold)">🏆 历史最佳: ${G.pveMaxStreak} 连胜！</p>`:''}
       </div>
     </div>
     <div class="grid-2">
@@ -3461,6 +3615,7 @@ function renderHeroCard(h){
       <div class="bar-wrap"><div class="bar-fill" style="width:${(h.exp/expNeed)*100}%;background:var(--exp-bar)"></div></div>
       <div class="text-xs text-dim">EXP: ${h.exp}/${expNeed}</div>
       <div class="hero-skills">${allSkills.map(sid=>{const sk=SKILLS[sid];return sk?`<span class="skill-tag" title="${sk.desc}">${sk.icon}${sk.name}</span>`:''}).join('')}</div>
+      ${h.traits&&h.traits.length>0?`<div class="mt-4" style="display:flex;flex-wrap:wrap;gap:2px">${h.traits.map(t=>`<span class="trait-tag" title="${t.desc}">${t.icon}${t.name}</span>`).join('')}</div>`:''}
       <div class="text-xs text-dim mt-4" style="font-style:italic">"${h.lore}"</div>
     </div>
   </div>`;
