@@ -3042,6 +3042,8 @@ function refreshTavernOptions(){
 
 // 酒馆当前显示的英雄选项缓存（避免招募后重新随机）
 var G_tavernOptions = null;
+// 酒馆中已被招募的英雄ID集合
+var G_tavernRecruited = new Set();
 
 function getRecruitOptions(){
   // 如果已有缓存，直接返回（招募后不重新随机）
@@ -3071,26 +3073,27 @@ function getRecruitOptions(){
     }
   }
   G_tavernOptions = options;
+  G_tavernRecruited = new Set();
   return options;
 }
 
 function recruitHero(templateId){
   const tpl=HERO_TEMPLATES.find(t=>t.id===templateId);
   if(!tpl)return;
+  // 已招募的英雄不能重复招募
+  if(G_tavernRecruited.has(templateId)){showToast('该英雄已被招募！');return}
   const costs={common:30,rare:80,epic:200,legendary:500,mythic:1200};
   const cost=costs[tpl.quality]||50;
   if(G.resources.gold<cost){showToast('金币不足！');return}
   G.resources.gold-=cost;
   const hero=createHero(tpl.id);
   G.heroes.push(hero);
-  // 从酒馆缓存中移除已招募的英雄（不重新随机）
-  if(G_tavernOptions){
-    G_tavernOptions=G_tavernOptions.filter(t=>t.id!==templateId);
-  }
+  // 标记为已招募（不移除，保持展示）
+  G_tavernRecruited.add(templateId);
   updateResUI();
   saveGame();
   showToast(`招募成功！获得 ${hero.icon} ${hero.name}`);
-  // 招募后保持在酒馆，显示剩余英雄
+  // 招募后保持在酒馆，已招募的显示为灰色禁用
   renderTavernRecruit();
 }
 
@@ -3212,8 +3215,20 @@ function renderTavernRecruit(){
   const options=getRecruitOptions();
   const costs={common:30,rare:80,epic:200,legendary:500,mythic:1200};
   const content=document.getElementById('content');
-  const heroesHTML = options.length > 0 ? options.map(tpl=>{
+  const heroesHTML = options.map(tpl=>{
           const role=ROLES[tpl.role];
+          const recruited=G_tavernRecruited.has(tpl.id);
+          if(recruited){
+            return`<div class="panel" style="text-align:center;opacity:0.4;pointer-events:none">
+              <div style="font-size:40px;margin:8px 0;filter:grayscale(1)">${tpl.icon}</div>
+              <div class="q-${tpl.quality}" style="font-size:14px;font-weight:bold">${tpl.name}</div>
+              <div class="text-dim text-xs">${QUALITY_NAMES[tpl.quality]} · ${role.name}</div>
+              <div class="text-dim text-xs mt-4">${role.desc}</div>
+              <div class="text-xs mt-4" style="color:var(--text3)">技能：${tpl.skills.map(s=>SKILLS[s]?SKILLS[s].name:s).join(', ')}</div>
+              <div style="margin-top:8px;color:var(--gold)">💰 ${costs[tpl.quality]}</div>
+              <button class="btn btn-sm mt-8" style="background:#555;color:#999;cursor:not-allowed" disabled>已招募</button>
+            </div>`;
+          }
           return`<div class="panel" style="text-align:center">
             <div style="font-size:40px;margin:8px 0">${tpl.icon}</div>
             <div class="q-${tpl.quality}" style="font-size:14px;font-weight:bold">${tpl.name}</div>
@@ -3223,7 +3238,7 @@ function renderTavernRecruit(){
             <div style="margin-top:8px;color:var(--gold)">💰 ${costs[tpl.quality]}</div>
             <button class="btn btn-primary btn-sm mt-8" onclick="recruitHero('${tpl.id}')">招募</button>
           </div>`;
-        }).join('') : '<div class="text-dim" style="grid-column:1/-1;text-align:center;padding:20px">所有英雄已招募完毕，请刷新获取新英雄</div>';
+        }).join('');
   content.innerHTML=`
     <div class="panel">
       <div class="panel-title"><span class="icon">🍺</span> 酒馆招募</div>
