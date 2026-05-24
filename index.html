@@ -3531,7 +3531,7 @@ function renderBattle(el){
       <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;margin-bottom:12px;font-size:11px">
         <div style="color:var(--gold);margin-bottom:4px">📊 资源稀缺加成（资源越少奖励越多）</div>
         <div>💰 金币奖励: <b style="color:#2ed573">${goldBonus}%</b> | 🪨⛏️🍞 资源奖励: <b style="color:#2ed573">${resBonus}%</b> | 💎 BOSS宝石: <b style="color:#2ed573">${gemBonus}%</b></div>
-      </div>`
+      </div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">
         ${showStages.map(s=>{
           const unlocked=s.id<=G.stageProgress;
