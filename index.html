@@ -274,6 +274,7 @@ body{background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingF
     <div class="nav-btn" data-tab="equip" title="装备">🗡️<div class="nav-label">装备</div></div>
     <div class="nav-btn" data-tab="buildings" title="建筑">🏗️<div class="nav-label">建筑</div></div>
     <div class="nav-btn" data-tab="arena" title="竞技场">🏟️<div class="nav-label">竞技场</div></div>
+    <div class="nav-btn" data-tab="codex" title="图鉴">📖<div class="nav-label">图鉴</div></div>
     <div class="nav-btn" data-tab="cheats" id="nav-cheats-btn" title="金手指" style="color:#c0392b">🔓<div class="nav-label">金手指</div></div>
   </div>
   <div id="main">
@@ -935,11 +936,24 @@ let G = {
   battleState: null,
   heroIdCounter: 0,
   // PVE连胜系统
-  pveWinStreak: 0,          // 当前连胜数
-  pveMaxStreak: 0,           // 历史最高连胜
+  pveWinStreak: 0,
+  pveMaxStreak: 0,
   // 每日登录
-  lastLoginDate: '',         // 上次登录日期
-  dailyBonusClaimed: false,  // 今日是否已领取
+  lastLoginDate: '',
+  dailyBonusClaimed: false,
+  // 图鉴系统：记录已遇见/拥有的ID
+  codex: {
+    heroes: {},    // heroTemplateId -> true
+    equipment: {}, // equipTemplateId -> true
+    monsters: {},  // monsterName -> true
+  },
+  // 探索事件统计
+  exploreStats: {
+    totalBattles: 0,
+    totalEvents: 0,
+    totalChests: 0,
+    totalShrines: 0,
+  },
   // 竞技场状态
   arenaState:{
     dailyChallengesUsed:0,
@@ -1141,6 +1155,121 @@ function createHero(templateId,level=1){
   // 分配随机特质
   assignTraits(hero);
   return hero;
+}
+
+// ==================== 探索事件系统（借鉴地下城堡） ====================
+// 战斗中随机触发事件，增加探索乐趣
+const EXPLORE_EVENTS = [
+  {id:'chest',    name:'宝箱',     icon:'📦', weight:25, desc:'发现了一个古老的宝箱！',
+    effect:function(){
+      var goldR=Math.floor(50+G.stageProgress*20+Math.random()*100);
+      var stoneR=Math.floor(10+G.stageProgress*5);
+      G.resources.gold=Math.min((G.resources.gold||0)+goldR,RESOURCE_LIMITS.gold);
+      G.resources.stone=Math.min((G.resources.stone||0)+stoneR,RESOURCE_LIMITS.stone);
+      G.exploreStats.totalChests++;
+      return '打开宝箱获得 💰'+goldR+' 🪨'+stoneR;
+    }},
+  {id:'food',     name:'食物补给', icon:'🍞', weight:20, desc:'发现了一处废弃的补给点！',
+    effect:function(){
+      var foodR=Math.floor(30+G.stageProgress*10+Math.random()*50);
+      G.resources.food=Math.min((G.resources.food||0)+foodR,RESOURCE_LIMITS.food);
+      return '获得食物补给 🍞'+foodR;
+    }},
+  {id:'shrine',   name:'神秘祭坛', icon:'⛩️', weight:10, desc:'一座散发着微光的祭坛...',
+    effect:function(){
+      G.exploreStats.totalShrines++;
+      var effects=[
+        function(){var h=G.heroes.find(x=>G.team.some(t=>t&&t.uid===x.uid));if(h){h.maxHP=Math.floor(h.maxHP*1.05);h.hp=Math.min(h.hp+Math.floor(h.maxHP*0.3),h.maxHP);return '祭坛赐予 '+h.name+' 生命+5%！'}return '祭坛的力量消散了...'},
+        function(){var h=G.heroes.find(x=>G.team.some(t=>t&&t.uid===x.uid));if(h){h.atk=Math.floor(h.atk*1.05);return '祭坛赐予 '+h.name+' 攻击+5%！'}return '祭坛的力量消散了...'},
+        function(){var h=G.heroes.find(x=>G.team.some(t=>t&&t.uid===x.uid));if(h){h.def=Math.floor(h.def*1.05);return '祭坛赐予 '+h.name+' 防御+5%！'}return '祭坛的力量消散了...'},
+        function(){G.resources.gems=Math.min((G.resources.gems||0)+1,RESOURCE_LIMITS.gems);return '祭坛赐予 💎宝石+1！'},
+      ];
+      return pick(effects)();
+    }},
+  {id:'trap',     name:'陷阱',     icon:'⚠️', weight:15, desc:'不小心触发了陷阱！',
+    effect:function(){
+      var h=G.heroes.find(x=>G.team.some(t=>t&&t.uid===x.uid));
+      if(h){
+        var dmg=Math.floor(h.maxHP*0.1);
+        h.hp=Math.max(1,h.hp-dmg);
+        return h.name+' 踩中陷阱，受到 '+dmg+' 点伤害！';
+      }
+      return '陷阱被巧妙地避开了！';
+    }},
+  {id:'merchant', name:'旅行商人', icon:'🧳', weight:12, desc:'一位神秘的旅行商人出现在前方...',
+    effect:function(){
+      // 花金币换宝石
+      var cost=Math.floor(100+G.stageProgress*30);
+      if((G.resources.gold||0)>=cost){
+        G.resources.gold-=cost;
+        G.resources.gems=Math.min((G.resources.gems||0)+1,RESOURCE_LIMITS.gems);
+        return '花费 💰'+cost+' 购买了 💎宝石+1！';
+      }
+      return '商人摇头离去...（金币不足 '+cost+'）';
+    }},
+  {id:'spring',   name:'治愈泉水', icon:'⛲', weight:15, desc:'发现了一处清澈的泉水！',
+    effect:function(){
+      G.heroes.forEach(function(h){
+        if(G.team.some(t=>t&&t.uid===h.uid)){
+          var heal=Math.floor(h.maxHP*0.2);
+          h.hp=Math.min(h.maxHP,h.hp+heal);
+        }
+      });
+      return '泉水恢复了队伍 20% 生命值！';
+    }},
+  {id:'iron',     name:'矿脉',     icon:'⛏️', weight:8, desc:'发现了一处隐蔽的矿脉！',
+    effect:function(){
+      var ironR=Math.floor(15+G.stageProgress*5+Math.random()*20);
+      var stoneR=Math.floor(20+G.stageProgress*8);
+      G.resources.iron=Math.min((G.resources.iron||0)+ironR,RESOURCE_LIMITS.iron);
+      G.resources.stone=Math.min((G.resources.stone||0)+stoneR,RESOURCE_LIMITS.stone);
+      return '开采矿脉获得 ⛏️'+ironR+' 🪨'+stoneR;
+    }},
+  {id:'curse',    name:'诅咒之地', icon:'💀', weight:5, desc:'空气中弥漫着诅咒的气息...',
+    effect:function(){
+      var h=G.heroes.find(x=>G.team.some(t=>t&&t.uid===x.uid));
+      if(h){
+        var goldLoss=Math.floor((G.resources.gold||0)*0.05);
+        G.resources.gold=Math.max(0,(G.resources.gold||0)-goldLoss);
+        return h.name+' 被诅咒侵蚀，损失 💰'+goldLoss+' 金币！';
+      }
+      return '诅咒的力量被驱散了！';
+    }},
+];
+
+function triggerExploreEvent(){
+  // 30%概率触发探索事件
+  if(Math.random()>0.30) return false;
+  G.exploreStats.totalEvents++;
+  // 加权随机选择事件
+  var totalWeight=EXPLORE_EVENTS.reduce(function(s,e){return s+e.weight},0);
+  var r=Math.random()*totalWeight;
+  var acc=0;
+  var event=EXPLORE_EVENTS[0];
+  for(var i=0;i<EXPLORE_EVENTS.length;i++){
+    acc+=EXPLORE_EVENTS[i].weight;
+    if(r<acc){event=EXPLORE_EVENTS[i];break}
+  }
+  var result=event.effect();
+  log('\n🌟 探索事件: '+event.icon+' '+event.name,'title');
+  log('  '+event.desc,'info');
+  log('  '+result,'skill');
+  saveGame();
+  return true;
+}
+
+// 记录图鉴
+function recordCodex(type, id){
+  if(!G.codex) G.codex={heroes:{},equipment:{},monsters:{}};
+  if(!G.codex[type]) G.codex[type]={};
+  G.codex[type][id]=true;
+}
+// 战斗中记录怪物图鉴
+function recordMonsterCodex(enemies){
+  if(!G.codex) G.codex={heroes:{},equipment:{},monsters:{}};
+  enemies.forEach(function(e){
+    G.codex.monsters[e.name]=true;
+  });
 }
 
 function getHeroStats(hero){
@@ -2661,6 +2790,11 @@ async function runBattle(stageId){
     pbbRound=round;
     roundBadge.textContent='回合 '+round;
     log('—— 第 '+round+' 回合 ——','title');
+    // 每3回合有概率触发探索事件（地下城堡风格）
+    if(round%3===0 && round<maxRounds-2){
+      triggerExploreEvent();
+      await sleep(200);
+    }
     await sleep(300);
 
     allUnits.filter(u=>u.alive).forEach(u=>{
@@ -2838,6 +2972,9 @@ async function runBattle(stageId){
   const won=enemyUnits.every(u=>!u.alive);
   if(won){
     const rw=stage.rewards;
+    // 记录怪物图鉴
+    recordMonsterCodex(stage.enemies||enemyUnits);
+    G.exploreStats.totalBattles++;
     // PVE连胜奖励
     if(stage.isBoss) G.pveWinStreak=(G.pveWinStreak||0)+1; // BOSS关才算连胜
     if(G.pveWinStreak>G.pveMaxStreak) G.pveMaxStreak=G.pveWinStreak;
@@ -2872,6 +3009,7 @@ async function runBattle(stageId){
         const tpl=pick(possibleDrops);
         drop={uid:++G.heroIdCounter,id:tpl.id,heroUid:null};
         G.equipment.push(drop);
+        recordCodex('equipment',tpl.id);
       }
     }
     log('\n📦 战利品：💰'+(rw.gold||0)+' 🍞'+(rw.food||0)+' 🪨'+(rw.stone||0)+' ⛏️'+(rw.iron||0)+(rw.gems?' 💎'+rw.gems:'')+' ⭐经验+'+(rw.exp||0)+(drop?' 🎁'+EQUIP_TEMPLATES.find(t=>t.id===drop.id).name:''),'title');
@@ -3437,6 +3575,8 @@ function getRecruitOptions(){
 function recruitHero(templateId){
   const tpl=HERO_TEMPLATES.find(t=>t.id===templateId);
   if(!tpl)return;
+  // 记录英雄图鉴（即使不招募也记录为"遇见"）
+  recordCodex('heroes',templateId);
   // 已招募的英雄不能重复招募
   if(G_tavernRecruited.has(templateId)){showToast('该英雄已被招募！');return}
   
@@ -3508,6 +3648,7 @@ function renderCurrentTab(){
     case 'equip': renderEquip(contentEl);break;
     case 'buildings': renderBuildings(contentEl);break;
     case 'arena': renderArena(contentEl);break;
+    case 'codex': renderCodex(contentEl);break;
     case 'cheats': renderCheats(contentEl);break;
   }
 }
@@ -4400,6 +4541,93 @@ var G_cheats = {
   forceMutation: false,
   showMergeResult: false  // 默认隐藏合成结果
 };
+
+// ==================== 图鉴系统 ====================
+function renderCodex(el){
+  if(!G.codex) G.codex={heroes:{},equipment:{},monsters:{}};
+  if(!G.exploreStats) G.exploreStats={totalBattles:0,totalEvents:0,totalChests:0,totalShrines:0};
+  
+  var heroTotal=HERO_TEMPLATES.length;
+  var heroFound=Object.keys(G.codex.heroes).length;
+  var equipTotal=EQUIP_TEMPLATES.length;
+  var equipFound=Object.keys(G.codex.equipment).length;
+  var monsterFound=Object.keys(G.codex.monsters).length;
+  
+  // 英雄图鉴
+  var heroHTML=HERO_TEMPLATES.map(function(tpl){
+    var found=G.codex.heroes[tpl.id];
+    var owned=G.heroes.some(function(h){return h.id===tpl.id});
+    return '<div class="hero-card quality-'+tpl.quality+'" style="opacity:'+(found?'1':'0.3')+';min-width:140px">'
+      +'<div class="hero-avatar" style="font-size:24px">'+(found?tpl.icon:'❓')+'</div>'
+      +'<div class="hero-info">'
+      +'<div class="hero-name"><span class="q-'+tpl.quality+'">'+(found?tpl.name:'???')+'</span></div>'
+      +'<div class="hero-meta">'+(found?(ROLES[tpl.role].icon+' '+ROLES[tpl.role].name+' · '+QUALITY_NAMES[tpl.quality]):'未发现')+'</div>'
+      +(owned?'<div class="text-xs text-green">✓ 已拥有</div>':'')
+      +'</div></div>';
+  }).join('');
+  
+  // 装备图鉴
+  var equipHTML=EQUIP_TEMPLATES.map(function(tpl){
+    var found=G.codex.equipment[tpl.id];
+    var owned=G.equipment.some(function(e){return e.id===tpl.id});
+    var stats=Object.entries(tpl.stats||{}).map(function(kv){return RESOURCE_DEFS[kv[0]]?RESOURCE_DEFS[kv[0]].icon+kv[1]:kv[0]+kv[1]}).join(' ');
+    return '<div class="hero-card quality-'+tpl.quality+'" style="opacity:'+(found?'1':'0.3')+';min-width:140px">'
+      +'<div class="hero-avatar" style="font-size:24px">'+(found?(tpl.icon||'🗡️'):'❓')+'</div>'
+      +'<div class="hero-info">'
+      +'<div class="hero-name"><span class="q-'+tpl.quality+'">'+(found?tpl.name:'???')+'</span></div>'
+      +'<div class="hero-meta">'+(found?(tpl.type+' · '+QUALITY_NAMES[tpl.quality]):'未发现')+'</div>'
+      +(found&&stats?'<div class="hero-stats text-xs">'+stats+'</div>':'')
+      +(owned?'<div class="text-xs text-green">✓ 已拥有</div>':'')
+      +'</div></div>';
+  }).join('');
+  
+  // 怪物图鉴
+  var monsterNames=Object.keys(G.codex.monsters).sort();
+  var monsterHTML=monsterNames.length>0?monsterNames.map(function(name){
+    return '<div style="display:inline-block;background:rgba(255,255,255,.05);border-radius:6px;padding:6px 10px;margin:3px;font-size:12px">'+name+'</div>';
+  }).join(''):'<div class="text-dim">暂无记录，去战斗中探索吧！</div>';
+  
+  // 收集进度条
+  function progressBar(found,total,label){
+    var pct=total>0?Math.round(found/total*100):0;
+    return '<div style="margin-bottom:12px">'
+      +'<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>'+label+'</span><span class="text-dim">'+found+'/'+total+' ('+pct+'%)</span></div>'
+      +'<div style="background:rgba(255,255,255,.1);border-radius:4px;height:8px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,var(--gold),#ff6b00);border-radius:4px;transition:width .3s"></div></div>'
+      +'</div>';
+  }
+  
+  el.innerHTML=`
+    <div class="panel">
+      <div class="panel-title"><span class="icon">📖</span> 冒险图鉴</div>
+      <div style="color:var(--text2);font-size:12px;margin-bottom:12px">记录你在冒险中遇到的所有英雄、装备和怪物</div>
+      
+      <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:12px;margin-bottom:16px">
+        <div style="color:var(--gold);font-weight:bold;margin-bottom:8px">📊 收集进度</div>
+        ${progressBar(heroFound,heroTotal,'⚔️ 英雄图鉴')}
+        ${progressBar(equipFound,equipTotal,'🗡️ 装备图鉴')}
+        ${progressBar(monsterFound,'??','👾 怪物图鉴')}
+        <div style="margin-top:8px;font-size:11px;color:var(--text3)">
+          📈 探索统计: 战斗${G.exploreStats.totalBattles}次 | 事件${G.exploreStats.totalEvents}次 | 宝箱${G.exploreStats.totalChests}个 | 祭坛${G.exploreStats.totalShrines}次
+        </div>
+      </div>
+    </div>
+    
+    <div class="panel">
+      <div class="panel-title"><span class="icon">⚔️</span> 英雄图鉴 (${heroFound}/${heroTotal})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${heroHTML}</div>
+    </div>
+    
+    <div class="panel">
+      <div class="panel-title"><span class="icon">🗡️</span> 装备图鉴 (${equipFound}/${equipTotal})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${equipHTML}</div>
+    </div>
+    
+    <div class="panel">
+      <div class="panel-title"><span class="icon">👾</span> 怪物图鉴 (${monsterFound})</div>
+      <div style="margin-top:10px">${monsterHTML}</div>
+    </div>
+  `;
+}
 
 function renderCheats(el){
   if(!G_cheats.unlocked){
