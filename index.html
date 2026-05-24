@@ -806,19 +806,19 @@ const BUILDING_DEFS = {
     desc:'生产大量食物，用于酒馆刷新',
     maxLevel:5,
     baseCost:{gold:100, stone:20},
-    // 食物产出配置（大幅提升）
-    foodProductionByLevel:{1:200,2:500,3:1000,4:2000,5:5000},
-    effects:['每小时+200食物','每小时+500食物','每小时+1000食物','每小时+2000食物','每小时+5000食物']
+    // 食物产出配置（降低产出，增加难度）
+    foodProductionByLevel:{1:60,2:150,3:300,4:600,5:1200},
+    effects:['每小时+60食物','每小时+150食物','每小时+300食物','每小时+600食物','每小时+1200食物']
   },
   mine:      {
     name:'矿场', icon:'⛏️',
     desc:'开采石材和铁矿',
     maxLevel:5,
     baseCost:{gold:200, stone:50},
-    // 石材+铁矿产出配置（大幅提升）
-    stoneProductionByLevel:{1:200,2:500,3:1000,4:2000,5:5000},
-    ironProductionByLevel:{1:60,2:160,3:350,4:700,5:1500},
-    effects:['每小时+200石材,+60铁矿','每小时+500石材,+160铁矿','每小时+1000石材,+350铁矿','每小时+2000石材,+700铁矿','每小时+5000石材,+1500铁矿']
+    // 石材+铁矿产出配置（降低产出，增加难度）
+    stoneProductionByLevel:{1:60,2:150,3:300,4:600,5:1200},
+    ironProductionByLevel:{1:20,2:50,3:100,4:200,5:400},
+    effects:['每小时+60石材,+20铁矿','每小时+150石材,+50铁矿','每小时+300石材,+100铁矿','每小时+600石材,+200铁矿','每小时+1200石材,+400铁矿']
   },
   blacksmith:{
     name:'铁匠铺', icon:'🔨',
@@ -860,18 +860,18 @@ const ARENA_CONFIG = {
 
 // 酒馆刷新配置
 const TAVERN_REFRESH = {
-  // 刷新费用（大幅降低食物消耗）
+  // 刷新费用（大幅增加，增加难度）
   costByLevel:{
-    1:{gold:50, food:5},
-    2:{gold:80, food:10},
-    3:{gold:120, food:15},
-    4:{gold:160, food:20},
-    5:{gold:200, food:25},
-    6:{gold:240, food:30},
-    7:{gold:280, food:35},
-    8:{gold:320, food:40},
-    9:{gold:360, food:45},
-    10:{gold:400, food:50}
+    1:{gold:200, food:20},
+    2:{gold:350, food:35},
+    3:{gold:500, food:50},
+    4:{gold:700, food:70},
+    5:{gold:900, food:90},
+    6:{gold:1200, food:120},
+    7:{gold:1500, food:150},
+    8:{gold:2000, food:200},
+    9:{gold:2500, food:250},
+    10:{gold:3000, food:300}
   },
   maxQualityByLevel:{1:'rare',2:'rare',3:'epic',4:'epic',5:'legendary',6:'legendary',7:'mythic',8:'mythic',9:'mythic',10:'mythic'},
   optionsCount:{1:3,2:3,3:4,4:4,5:4,6:5,7:5,8:5,9:5,10:6}, // 可选英雄数量
@@ -3082,7 +3082,7 @@ function recruitHero(templateId){
   if(!tpl)return;
   // 已招募的英雄不能重复招募
   if(G_tavernRecruited.has(templateId)){showToast('该英雄已被招募！');return}
-  const costs={common:30,rare:80,epic:200,legendary:500,mythic:1200};
+  const costs={common:100,rare:300,epic:800,legendary:2000,mythic:5000};
   const cost=costs[tpl.quality]||50;
   if(G.resources.gold<cost){showToast('金币不足！');return}
   G.resources.gold-=cost;
