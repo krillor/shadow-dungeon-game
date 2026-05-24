@@ -822,12 +822,12 @@ const RESOURCE_DEFS = {
 const BUILDING_DEFS = {
   tavern:    {
     name:'酒馆', icon:'🍺', 
-    desc:'招募新英雄，升级解锁更高品质',
+    desc:'招募新英雄，升级解锁更高品质英雄',
     maxLevel:10,
     baseCost:{gold:200, stone:30, food:10},
     // 声望需求随等级递增（前期低后期高）
     upgradeReqByLevel:{2:{fame:3},3:{fame:8},4:{fame:15},5:{fame:25},6:{fame:40},7:{fame:60},8:{fame:85},9:{fame:120},10:{fame:160}},
-    effects:['解锁稀有英雄','解锁史诗英雄','解锁传说英雄','解锁神话英雄','提升刷新品质','降低刷新消耗','增加刷新选项','解锁觉醒英雄','解锁传说觉醒','酒馆满级·传说概率提升']
+    effects:['解锁稀有品质 · 3个可选英雄','3个可选英雄','解锁史诗品质 · 4个可选英雄','4个可选英雄','解锁传说品质 · 4个可选英雄','5个可选英雄','解锁神话品质 · 5个可选英雄','5个可选英雄','5个可选英雄','6个可选英雄 · 传说以上概率提升']
   },
   farm:{
     name:'农场', icon:'🌾',
@@ -2623,13 +2623,14 @@ async function runBattle(stageId){
   const won=enemyUnits.every(u=>!u.alive);
   if(won){
     const rw=stage.rewards;
-    G.resources.gold+=rw.gold||0;
-    G.resources.stone+=rw.stone||0;
-    G.resources.gems+=rw.gems||0;
+    // 奖励受资源上限约束
+    G.resources.gold=Math.min((G.resources.gold||0)+(rw.gold||0), RESOURCE_LIMITS.gold);
+    G.resources.stone=Math.min((G.resources.stone||0)+(rw.stone||0), RESOURCE_LIMITS.stone);
+    G.resources.gems=Math.min((G.resources.gems||0)+(rw.gems||0), RESOURCE_LIMITS.gems);
     // 其他资源奖励
-    G.resources.iron+=rw.iron||Math.floor((rw.stone||0)*0.3);
-    G.resources.food+=rw.food||Math.floor((rw.gold||0)*0.1);
-    G.resources.fame+=rw.fame||Math.floor((rw.gold||0)/100);
+    G.resources.iron=Math.min((G.resources.iron||0)+(rw.iron||Math.floor((rw.stone||0)*0.3)), RESOURCE_LIMITS.iron);
+    G.resources.food=Math.min((G.resources.food||0)+(rw.food||Math.floor((rw.gold||0)*0.1)), RESOURCE_LIMITS.food);
+    G.resources.fame=Math.min((G.resources.fame||0)+(rw.fame||Math.floor((rw.gold||0)/100)), RESOURCE_LIMITS.fame);
     if(stage.id>=G.stageProgress){G.stageProgress=stage.id+1}
     G_currentStageId=stage.id+1;
     teamHeroes.forEach(h=>addHeroExp(h,rw.exp||0));
@@ -3342,7 +3343,7 @@ function renderTavernRecruit(){
   content.innerHTML=`
     <div class="panel">
       <div class="panel-title"><span class="icon">🍺</span> 酒馆招募</div>
-      <div class="text-dim text-sm mb-8">酒馆等级：${G.buildings.tavern} | 每次刷新3位英雄</div>
+      <div class="text-dim text-sm mb-8">酒馆等级：${G.buildings.tavern} | 本次可选英雄数量：${TAVERN_REFRESH.optionsCount[G.buildings.tavern]||3}</div>
       <div class="grid-3">
         ${heroesHTML}
       </div>
