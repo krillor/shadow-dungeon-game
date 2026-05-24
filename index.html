@@ -725,13 +725,24 @@ function generateStage(id){
     }
   }
 
-  // 奖励计算（根据难度调整）
+  // 奖励计算（前期快、中后期慢的难度曲线）
   var difficultyMult=1+cycle*0.3+(isBoss?0.5:0)+(isFinalBoss?1:0);
-  var goldR=Math.floor((60+id*25)*difficultyMult);
-  var expR=Math.floor((25+id*12)*difficultyMult);
-  var stoneR=Math.floor((15+id*6)*difficultyMult);
-  var herbsR=Math.floor(id*2*difficultyMult);
-  var gemsR=isBoss?Math.floor(1+cycle):0;
+  // 金币/经验：前期快速增长，中后期放缓
+  var goldR=Math.floor((60+id*20)*difficultyMult*(1/(1+cycle*0.2)));
+  var expR=Math.floor((25+id*10)*difficultyMult*(1/(1+cycle*0.15)));
+  // 石材/草药：基础产出，随进度缓慢增长
+  var stoneR=Math.floor((15+id*4)*difficultyMult*(1/(1+cycle*0.3)));
+  var herbsR=Math.floor(id*1.5*difficultyMult*(1/(1+cycle*0.25)));
+  // 宝石：BOSS掉落，前期多后期需求大（传说/神话招募需要）
+  // 小BOSS：1-3宝石，最终BOSS：3-8宝石，随周目增加
+  var gemsR=0;
+  if(isBoss){
+    if(isFinalBoss){
+      gemsR=Math.floor(3+Math.min(cycle*1.5,5)); // 最终BOSS：3-8宝石
+    }else{
+      gemsR=Math.floor(1+Math.min(cycle*0.8,2)); // 小BOSS：1-3宝石
+    }
+  }
 
   return {
     id:id,
@@ -797,34 +808,32 @@ const BUILDING_DEFS = {
     name:'酒馆', icon:'🍺', 
     desc:'招募新英雄，升级解锁更高品质',
     maxLevel:10,
-    baseCost:{gold:300, stone:50, food:20},
-    upgradeReq:{fame:5},
+    baseCost:{gold:200, stone:30, food:10},
+    upgradeReq:{fame:3},
     effects:['解锁稀有英雄','解锁史诗英雄','解锁传说英雄','解锁神话英雄','提升刷新品质','降低刷新消耗','增加刷新选项','解锁觉醒英雄','解锁传说觉醒']
   },
   farm:{
     name:'农场', icon:'🌾',
     desc:'生产大量食物，用于酒馆刷新',
     maxLevel:5,
-    baseCost:{gold:100, stone:20},
-    // 食物产出配置（降低产出，增加难度）
-    foodProductionByLevel:{1:60,2:150,3:300,4:600,5:1200},
-    effects:['每小时+60食物','每小时+150食物','每小时+300食物','每小时+600食物','每小时+1200食物']
+    baseCost:{gold:80, stone:15},
+    foodProductionByLevel:{1:100,2:200,3:350,4:550,5:800},
+    effects:['每小时+100食物','每小时+200食物','每小时+350食物','每小时+550食物','每小时+800食物']
   },
   mine:      {
     name:'矿场', icon:'⛏️',
     desc:'开采石材和铁矿',
     maxLevel:5,
-    baseCost:{gold:200, stone:50},
-    // 石材+铁矿产出配置（降低产出，增加难度）
-    stoneProductionByLevel:{1:60,2:150,3:300,4:600,5:1200},
-    ironProductionByLevel:{1:20,2:50,3:100,4:200,5:400},
-    effects:['每小时+60石材,+20铁矿','每小时+150石材,+50铁矿','每小时+300石材,+100铁矿','每小时+600石材,+200铁矿','每小时+1200石材,+400铁矿']
+    baseCost:{gold:150, stone:30},
+    stoneProductionByLevel:{1:80,2:160,3:280,4:450,5:650},
+    ironProductionByLevel:{1:30,2:60,3:100,4:150,5:220},
+    effects:['每小时+80石材,+30铁矿','每小时+160石材,+60铁矿','每小时+280石材,+100铁矿','每小时+450石材,+150铁矿','每小时+650石材,+220铁矿']
   },
   blacksmith:{
     name:'铁匠铺', icon:'🔨',
     desc:'锻造装备，消耗铁矿',
     maxLevel:5,
-    baseCost:{gold:300, stone:50, iron:10},
+    baseCost:{gold:200, stone:30, iron:5},
     forgeQualityByLevel:{1:'common',2:'rare',3:'epic',4:'legendary',5:'mythic'},
     effects:['可锻造普通装备','可锻造稀有装备','可锻造史诗装备','可锻造传说装备','可锻造神话装备']
   },
@@ -832,7 +841,7 @@ const BUILDING_DEFS = {
     name:'神殿', icon:'⛪',
     desc:'提升英雄等级上限',
     maxLevel:5,
-    baseCost:{gold:500, gems:10},
+    baseCost:{gold:400, gems:5},
     heroLevelCapByLevel:{0:20,1:40,2:60,3:80,4:100,5:120},
     effects:['英雄等级上限 40','英雄等级上限 60','英雄等级上限 80','英雄等级上限 100','英雄等级上限 120']
   },
@@ -840,7 +849,7 @@ const BUILDING_DEFS = {
     name:'竞技场', icon:'🏟️',
     desc:'挑战获取声望和金币',
     maxLevel:3,
-    baseCost:{gold:300, stone:50},
+    baseCost:{gold:200, stone:30},
     effects:['每日2次挑战','每日3次挑战','每日5次挑战+声望奖励']
   },
 };
@@ -860,18 +869,18 @@ const ARENA_CONFIG = {
 
 // 酒馆刷新配置
 const TAVERN_REFRESH = {
-  // 刷新费用（大幅增加，增加难度）
+  // 刷新费用：前期便宜、后期贵（指数增长）
   costByLevel:{
-    1:{gold:200, food:20},
-    2:{gold:350, food:35},
-    3:{gold:500, food:50},
-    4:{gold:700, food:70},
-    5:{gold:900, food:90},
-    6:{gold:1200, food:120},
-    7:{gold:1500, food:150},
-    8:{gold:2000, food:200},
-    9:{gold:2500, food:250},
-    10:{gold:3000, food:300}
+    1:{gold:50, food:10},
+    2:{gold:100, food:15},
+    3:{gold:200, food:25},
+    4:{gold:400, food:40},
+    5:{gold:800, food:60},
+    6:{gold:1500, food:90},
+    7:{gold:3000, food:130},
+    8:{gold:6000, food:180},
+    9:{gold:12000, food:250},
+    10:{gold:25000, food:350}
   },
   maxQualityByLevel:{1:'rare',2:'rare',3:'epic',4:'epic',5:'legendary',6:'legendary',7:'mythic',8:'mythic',9:'mythic',10:'mythic'},
   optionsCount:{1:3,2:3,3:4,4:4,5:4,6:5,7:5,8:5,9:5,10:6}, // 可选英雄数量
@@ -3082,17 +3091,31 @@ function recruitHero(templateId){
   if(!tpl)return;
   // 已招募的英雄不能重复招募
   if(G_tavernRecruited.has(templateId)){showToast('该英雄已被招募！');return}
-  const costs={common:100,rare:300,epic:800,legendary:2000,mythic:5000};
-  const cost=costs[tpl.quality]||50;
-  if(G.resources.gold<cost){showToast('金币不足！');return}
-  G.resources.gold-=cost;
+  
+  // 招募成本：前期金币，后期需要钻石
+  const goldCosts={common:50,rare:150,epic:400,legendary:0,mythic:0};
+  const gemCosts={common:0,rare:0,epic:0,legendary:5,mythic:15};
+  
+  const goldCost=goldCosts[tpl.quality]||50;
+  const gemCost=gemCosts[tpl.quality]||0;
+  
+  // 检查资源
+  if(goldCost>0 && G.resources.gold<goldCost){showToast(`金币不足！需要 ${goldCost} 金币`);return}
+  if(gemCost>0 && G.resources.gems<gemCost){showToast(`宝石不足！需要 ${gemCost} 宝石，击败BOSS可获得`);return}
+  
+  // 扣除资源
+  if(goldCost>0) G.resources.gold-=goldCost;
+  if(gemCost>0) G.resources.gems-=gemCost;
+  
   const hero=createHero(tpl.id);
   G.heroes.push(hero);
   // 标记为已招募（不移除，保持展示）
   G_tavernRecruited.add(templateId);
   updateResUI();
   saveGame();
-  showToast(`招募成功！获得 ${hero.icon} ${hero.name}`);
+  
+  const costStr=goldCost>0?`${goldCost}金币`:gemCost>0?`${gemCost}宝石`:`${goldCost}金币+${gemCost}宝石`;
+  showToast(`招募成功！消耗 ${costStr}，获得 ${hero.icon} ${hero.name}`);
   // 招募后保持在酒馆，已招募的显示为灰色禁用
   renderTavernRecruit();
 }
@@ -3213,11 +3236,16 @@ function renderTown(el){
 
 function renderTavernRecruit(){
   const options=getRecruitOptions();
-  const costs={common:30,rare:80,epic:200,legendary:500,mythic:1200};
+  // 招募成本显示
+  const goldCosts={common:50,rare:150,epic:400,legendary:0,mythic:0};
+  const gemCosts={common:0,rare:0,epic:0,legendary:5,mythic:15};
   const content=document.getElementById('content');
   const heroesHTML = options.map(tpl=>{
           const role=ROLES[tpl.role];
           const recruited=G_tavernRecruited.has(tpl.id);
+          const goldCost=goldCosts[tpl.quality];
+          const gemCost=gemCosts[tpl.quality];
+          const costDisplay=gemCost>0?`💎 ${gemCost}`:`💰 ${goldCost}`;
           if(recruited){
             return`<div class="panel" style="text-align:center;opacity:0.4;pointer-events:none">
               <div style="font-size:40px;margin:8px 0;filter:grayscale(1)">${tpl.icon}</div>
@@ -3225,7 +3253,7 @@ function renderTavernRecruit(){
               <div class="text-dim text-xs">${QUALITY_NAMES[tpl.quality]} · ${role.name}</div>
               <div class="text-dim text-xs mt-4">${role.desc}</div>
               <div class="text-xs mt-4" style="color:var(--text3)">技能：${tpl.skills.map(s=>SKILLS[s]?SKILLS[s].name:s).join(', ')}</div>
-              <div style="margin-top:8px;color:var(--gold)">💰 ${costs[tpl.quality]}</div>
+              <div style="margin-top:8px;color:var(--gold)">${costDisplay}</div>
               <button class="btn btn-sm mt-8" style="background:#555;color:#999;cursor:not-allowed" disabled>已招募</button>
             </div>`;
           }
@@ -3235,7 +3263,7 @@ function renderTavernRecruit(){
             <div class="text-dim text-xs">${QUALITY_NAMES[tpl.quality]} · ${role.name}</div>
             <div class="text-dim text-xs mt-4">${role.desc}</div>
             <div class="text-xs mt-4" style="color:var(--text3)">技能：${tpl.skills.map(s=>SKILLS[s]?SKILLS[s].name:s).join(', ')}</div>
-            <div style="margin-top:8px;color:var(--gold)">💰 ${costs[tpl.quality]}</div>
+            <div style="margin-top:8px;color:var(--gold)">${costDisplay}</div>
             <button class="btn btn-primary btn-sm mt-8" onclick="recruitHero('${tpl.id}')">招募</button>
           </div>`;
         }).join('');
