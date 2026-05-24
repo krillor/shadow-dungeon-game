@@ -725,22 +725,38 @@ function generateStage(id){
     }
   }
 
-  // 奖励计算（前期快、中后期慢的难度曲线）
+  // 奖励计算：与当前资源挂钩（资源越少奖励越多，鼓励消耗）
   var difficultyMult=1+cycle*0.3+(isBoss?0.5:0)+(isFinalBoss?1:0);
-  // 金币/经验：前期快速增长，中后期放缓
-  var goldR=Math.floor((60+id*20)*difficultyMult*(1/(1+cycle*0.2)));
-  var expR=Math.floor((25+id*10)*difficultyMult*(1/(1+cycle*0.15)));
-  // 石材/草药：基础产出，随进度缓慢增长
-  var stoneR=Math.floor((15+id*4)*difficultyMult*(1/(1+cycle*0.3)));
-  var herbsR=Math.floor(id*1.5*difficultyMult*(1/(1+cycle*0.25)));
-  // 宝石：BOSS掉落，前期多后期需求大（传说/神话招募需要）
-  // 小BOSS：1-3宝石，最终BOSS：3-8宝石，随周目增加
+  
+  // 计算资源比例（越少奖励越多，最多2倍加成）
+  var goldRatio=(G.resources.gold||0)/RESOURCE_LIMITS.gold;
+  var foodRatio=(G.resources.food||0)/RESOURCE_LIMITS.food;
+  var stoneRatio=(G.resources.stone||0)/RESOURCE_LIMITS.stone;
+  var ironRatio=(G.resources.iron||0)/RESOURCE_LIMITS.iron;
+  
+  // 资源稀缺加成：0资源=2倍，满资源=0.5倍
+  var goldBonus=2-Math.min(goldRatio*1.5,1.5);
+  var resourceBonus=2-Math.min((foodRatio+stoneRatio+ironRatio)/3*1.5,1.5);
+  
+  // 金币/经验：与金币存量挂钩（金币少时奖励多）
+  var baseGold=Math.floor((60+id*20)*difficultyMult*(1/(1+cycle*0.2)));
+  var goldR=Math.floor(baseGold*goldBonus);
+  var expR=Math.floor((25+id*10)*difficultyMult*(1/(1+cycle*0.15))*goldBonus);
+  
+  // 石材/草药/铁矿：与资源存量挂钩（资源少时奖励多）
+  var stoneR=Math.floor((15+id*4)*difficultyMult*(1/(1+cycle*0.3))*resourceBonus);
+  var herbsR=Math.floor(id*1.5*difficultyMult*(1/(1+cycle*0.25))*resourceBonus);
+  var ironR=Math.floor((8+id*2)*difficultyMult*(1/(1+cycle*0.35))*resourceBonus);
+  
+  // 宝石：BOSS掉落，与宝石存量挂钩（宝石少时掉落多）
   var gemsR=0;
   if(isBoss){
+    var gemRatio=(G.resources.gems||0)/RESOURCE_LIMITS.gems;
+    var gemBonus=2-Math.min(gemRatio*1.5,1.5);
     if(isFinalBoss){
-      gemsR=Math.floor(3+Math.min(cycle*1.5,5)); // 最终BOSS：3-8宝石
+      gemsR=Math.floor((3+Math.min(cycle*1.5,5))*gemBonus); // 最终BOSS：3-8宝石
     }else{
-      gemsR=Math.floor(1+Math.min(cycle*0.8,2)); // 小BOSS：1-3宝石
+      gemsR=Math.floor((1+Math.min(cycle*0.8,2))*gemBonus); // 小BOSS：1-3宝石
     }
   }
 
@@ -752,7 +768,7 @@ function generateStage(id){
     isBoss:isBoss,
     bossType:isFinalBoss?'final':isBoss?'mini':null,
     enemies:enemies,
-    rewards:{gold:goldR,exp:expR,stone:stoneR,herbs:herbsR,gems:gemsR}
+    rewards:{gold:goldR,exp:expR,stone:stoneR,herbs:herbsR,iron:ironR,gems:gemsR}
   };
 }
 
@@ -1043,6 +1059,16 @@ function getHeroStats(hero){
 var G_lastProductionTime=Date.now();
 var G_productionTimer=null;
 
+// 资源上限配置
+const RESOURCE_LIMITS = {
+  gold: 50000,      // 金币上限
+  gems: 999,        // 宝石上限
+  food: 5000,       // 食物上限（提升较多）
+  stone: 3000,      // 石材上限
+  iron: 1500,       // 铁矿上限
+  fame: 999         // 声望上限
+};
+
 function produceResources(){
   var now=Date.now();
   var minutesPassed=(now-G_lastProductionTime)/(1000*60);
@@ -1056,8 +1082,10 @@ function produceResources(){
     var foodPerMinute=foodPerHour/60;
     var foodProduced=Math.floor(foodPerMinute*minutesPassed);
     if(foodProduced>0){
-      G.resources.food+=foodProduced;
-      showToast('🌾 农场产出 '+foodProduced+' 食物');
+      var before=G.resources.food||0;
+      G.resources.food=Math.min((G.resources.food||0)+foodProduced, RESOURCE_LIMITS.food);
+      var actual=G.resources.food-before;
+      if(actual>0) showToast('🌾 农场产出 '+actual+' 食物'+(G.resources.food>=RESOURCE_LIMITS.food?' (已满)':''));
     }
   }
   
@@ -1071,10 +1099,25 @@ function produceResources(){
     var ironPerMinute=ironPerHour/60;
     var stoneProduced=Math.floor(stonePerMinute*minutesPassed);
     var ironProduced=Math.floor(ironPerMinute*minutesPassed);
-    if(stoneProduced>0||ironProduced>0){
-      G.resources.stone+=stoneProduced;
-      G.resources.iron+=ironProduced;
-      showToast('⛏️ 矿场产出 '+stoneProduced+' 石材 '+ironProduced+' 铁矿');
+    
+    var stoneBefore=G.resources.stone||0;
+    var ironBefore=G.resources.iron||0;
+    
+    if(stoneProduced>0){
+      G.resources.stone=Math.min((G.resources.stone||0)+stoneProduced, RESOURCE_LIMITS.stone);
+    }
+    if(ironProduced>0){
+      G.resources.iron=Math.min((G.resources.iron||0)+ironProduced, RESOURCE_LIMITS.iron);
+    }
+    
+    var stoneActual=(G.resources.stone||0)-stoneBefore;
+    var ironActual=(G.resources.iron||0)-ironBefore;
+    
+    if(stoneActual>0||ironActual>0){
+      var fullMsg='';
+      if(G.resources.stone>=RESOURCE_LIMITS.stone) fullMsg+=' 石材已满';
+      if(G.resources.iron>=RESOURCE_LIMITS.iron) fullMsg+=' 铁矿已满';
+      showToast('⛏️ 矿场产出 '+stoneActual+' 石材 '+ironActual+' 铁矿'+fullMsg);
     }
   }
   
@@ -2599,7 +2642,7 @@ async function runBattle(stageId){
         G.equipment.push(drop);
       }
     }
-    log('\n📦 战利品：💰'+(rw.gold||0)+' ⭐'+(rw.exp||0)+' 🪨'+(rw.stone||0)+' 🌿'+(rw.herbs||0)+(rw.gems?' 💎'+rw.gems:'')+(drop?' 🎁'+EQUIP_TEMPLATES.find(t=>t.id===drop.id).name:''),'title');
+    log('\n📦 战利品：💰'+(rw.gold||0)+' ⭐'+(rw.exp||0)+' 🪨'+(rw.stone||0)+' ⛏️'+(rw.iron||0)+' 🌿'+(rw.herbs||0)+(rw.gems?' 💎'+rw.gems:'')+(drop?' 🎁'+EQUIP_TEMPLATES.find(t=>t.id===drop.id).name:''),'title');
     showToast('战斗胜利！获得 '+rw.gold+' 金币');
   }else{
     showToast('战斗失败...');
@@ -3471,10 +3514,24 @@ function renderBattle(el){
   for(var i=Math.max(1,G.stageProgress-3);i<=G.stageProgress+5;i++){
     showStages.push(getStage(i));
   }
+  // 计算当前资源稀缺加成
+  var goldRatio=(G.resources.gold||0)/RESOURCE_LIMITS.gold;
+  var foodRatio=(G.resources.food||0)/RESOURCE_LIMITS.food;
+  var stoneRatio=(G.resources.stone||0)/RESOURCE_LIMITS.stone;
+  var ironRatio=(G.resources.iron||0)/RESOURCE_LIMITS.iron;
+  var gemRatio=(G.resources.gems||0)/RESOURCE_LIMITS.gems;
+  var goldBonus=Math.round((2-Math.min(goldRatio*1.5,1.5))*100);
+  var resBonus=Math.round((2-Math.min((foodRatio+stoneRatio+ironRatio)/3*1.5,1.5))*100);
+  var gemBonus=Math.round((2-Math.min(gemRatio*1.5,1.5))*100);
+  
   el.innerHTML=`
     <div class="panel">
       <div class="panel-title"><span class="icon">💀</span> 选择关卡 <span class="text-xs text-dim">（无限模式）</span></div>
       <div class="text-dim text-sm mb-8">队伍人数：${teamHeroes.length}/6 ${teamHeroes.length===0?'<span class="text-red">（请先编队！）</span>':''}</div>
+      <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;margin-bottom:12px;font-size:11px">
+        <div style="color:var(--gold);margin-bottom:4px">📊 资源稀缺加成（资源越少奖励越多）</div>
+        <div>💰 金币奖励: <b style="color:#2ed573">${goldBonus}%</b> | 🪨⛏️🍞 资源奖励: <b style="color:#2ed573">${resBonus}%</b> | 💎 BOSS宝石: <b style="color:#2ed573">${gemBonus}%</b></div>
+      </div>`
       <div style="display:flex;flex-wrap:wrap;gap:6px">
         ${showStages.map(s=>{
           const unlocked=s.id<=G.stageProgress;
