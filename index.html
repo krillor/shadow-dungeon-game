@@ -3121,8 +3121,11 @@ async function runBattle(stageId){
       setTimeout(function(){startBattle(G_currentStageId)},1500/G_battleSpeed);
     }else{
       G_autoBattle=false;
-      // 非自动战斗：清空按钮区域，使用顶部的"结束战斗"按钮
-      btnArea.innerHTML='';
+      // 非自动战斗：显示醒目的"返回"按钮
+      btnArea.innerHTML='<div style="text-align:center;padding:16px 0">'
+        +'<div style="font-size:16px;font-weight:bold;margin-bottom:8px">'+(won?'🎉 战斗胜利！':'💀 战斗失败...')+'</div>'
+        +'<button class="btn btn-primary" onclick="forceEndBattle()" style="font-size:14px;padding:8px 32px">返回关卡选择</button>'
+        +'</div>';
     }
   }
 }
@@ -4152,16 +4155,16 @@ function renderBattle(el){
         ${showStages.map(s=>{
           const unlocked=s.id<=G.stageProgress;
           const cleared=s.id<G.stageProgress;
-          return'<div class="stage-node '+(cleared?'cleared':'')+' '+(s.id===G.stageProgress?'current':'')+' '+(!unlocked?'locked':'')+'"'
+          const isCurrent=s.id===G.stageProgress;
+          const clickAction=isCurrent?'startBattle('+s.id+')':cleared?'stageAction('+s.id+')':'';
+          return'<div class="stage-node '+(cleared?'cleared':'')+' '+(isCurrent?'current':'')+' '+(!unlocked?'locked':'')+'"'
+            +(clickAction?' onclick="'+clickAction+'"':'')
             +' title="'+s.desc+'">'
             +'<span class="stage-icon">'+s.icon+'</span>'
             +'<span>'+(s.name.length>8?s.name.substring(0,8)+'…':s.name)+(s.isBoss?' <span class="text-gold">★'+(s.bossType==='final'?'★★':'')+'Boss</span>':'')+'</span>'
             +'<span class="text-xs text-dim">Lv.'+s.enemies[0].level+'</span>'
             +(cleared?'<span class="text-green text-xs">✓</span>':'')
-            +'<div style="display:flex;gap:4px;margin-top:4px">'
-            +(unlocked?'<button class="btn" style="font-size:10px;padding:2px 6px" onclick="event.stopPropagation();startBattle('+s.id+')">战斗</button>':'')
-            +(cleared?'<button class="btn" style="font-size:10px;padding:2px 6px;background:rgba(100,200,255,.2)" onclick="event.stopPropagation();quickClear('+s.id+')">扫荡</button>':'')
-            +'</div>'
+            +(isCurrent?'<span class="text-xs" style="color:#ff6b00">▶ 当前</span>':'')
             +'</div>';
         }).join('')}
       </div>
@@ -4186,6 +4189,20 @@ function startAutoBattle(fromStage){
 
 function startBattle(stageId){
   runBattle(stageId);
+}
+
+// 已通关关卡点击：弹出战斗/扫荡选择
+function stageAction(stageId){
+  var stage=getStage(stageId);
+  if(!stage)return;
+  openModal('<div class="panel" style="max-width:300px">'
+    +'<div style="font-size:16px;font-weight:bold;margin-bottom:12px">'+stage.icon+' '+stage.name+'</div>'
+    +'<div class="text-dim text-sm mb-8">'+stage.desc+'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'
+    +'<button class="btn btn-primary" onclick="closeModal();startBattle('+stageId+')">⚔️ 重新战斗</button>'
+    +'<button class="btn" style="background:rgba(100,200,255,.2)" onclick="closeModal();quickClear('+stageId+')">⚡ 快速扫荡</button>'
+    +'<button class="btn" onclick="closeModal()">取消</button>'
+    +'</div></div>');
 }
 
 // ==================== 扫荡功能 ====================
