@@ -3430,16 +3430,12 @@ function renderTown(el){
   var today=new Date().toDateString();
   el.innerHTML=`
     <!-- 每日奖励横幅 -->
-    ${G.dailyBonusClaimed?`
-    <div class="daily-bonus-banner" style="opacity:0.5">
-      <span style="font-size:16px">✅</span> 今日奖励已领取 · 明天再来！
-    </div>
-    `:`
+    ${!G.dailyBonusClaimed?`
     <div class="daily-bonus-banner" style="cursor:pointer" onclick="claimDailyBonus()">
       <span style="font-size:16px">🎁</span> 点击领取每日登录奖励！<br>
       <span class="text-xs text-dim">随进度提升：约${200+G.stageProgress*30}💰 ${100+G.stageProgress*10}🍞 ${30+G.stageProgress*5}🪨 ${15+G.stageProgress*3}⛏️</span>
     </div>
-    `}
+    `:''}
     <div class="panel">
       <div class="panel-title"><span class="icon">🏰</span> 暗影地牢</div>
       <div style="color:var(--text2);font-size:12px;line-height:1.8">
