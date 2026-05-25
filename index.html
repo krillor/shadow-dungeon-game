@@ -2851,15 +2851,19 @@ async function runBattle(stageId){
   // 初始化战斗统计数据
   resetBattleStats();
 
-  // 显示战斗面板，切换到战斗页
-  currentTab='battle';
-  document.querySelectorAll('.nav-btn').forEach(b=>{
-    b.classList.toggle('active',b.dataset.tab==='battle');
-  });
+  // 显示战斗面板，切换到战斗页（自动推图时跳过UI切换，后台执行）
+  if(!G_autoBattle){
+    currentTab='battle';
+    document.querySelectorAll('.nav-btn').forEach(b=>{
+      b.classList.toggle('active',b.dataset.tab==='battle');
+    });
+  }
   var battlePanel=document.getElementById('battle-panel');
   if(!battlePanel){showToast('战斗面板加载失败');G_battleRunning=false;return;}
-  battlePanel.style.display='';
-  document.getElementById('content').style.display='none';
+  if(!G_autoBattle){
+    battlePanel.style.display='';
+    document.getElementById('content').style.display='none';
+  }
   const logEl=document.getElementById('battle-log');
   const playerTeamEl=document.getElementById('player-team');
   const enemyTeamEl=document.getElementById('enemy-team');
@@ -3188,13 +3192,16 @@ async function runBattle(stageId){
   if(btnArea){
     if(G_autoBattle&&won){
       btnArea.innerHTML='<span class="text-gold text-sm">✅ 胜利！自动进入下一关...</span>';
-      // 不调用renderCurrentTab()，避免隐藏战斗面板
-      // 不设G_battleRunning=false，保持面板显示
       updateResUI();
       setTimeout(function(){
-        G_battleRunning=false; // 先重置，让runBattle重新初始化
+        G_battleRunning=false;
         startBattle(G_currentStageId);
       },1500/G_battleSpeed);
+    }else if(G_autoBattle&&!won){
+      // 自动推图失败：停止自动推图，不切回战斗页
+      G_battleRunning=false;
+      G_autoBattle=false;
+      showToast('💀 自动推图失败！关卡 '+G_currentStageId);
     }else{
       G_battleRunning=false;
       G_autoBattle=false;
@@ -3890,12 +3897,12 @@ function renderCurrentTab(){
   var contentEl=document.getElementById('content');
   var battlePanel=document.getElementById('battle-panel');
   
-  if(G_battleRunning && currentTab==='battle'){
-    // 战斗运行中切回战斗页：显示战斗面板，隐藏content
+  if(G_battleRunning && !G_autoBattle && currentTab==='battle'){
+    // 手动战斗中切回战斗页：显示战斗面板，隐藏content
     contentEl.style.display='none';
     battlePanel.style.display='';
-  }else if(G_battleRunning && currentTab!=='battle'){
-    // 战斗运行中切到其他页：隐藏战斗面板，显示content
+  }else if(G_battleRunning){
+    // 战斗运行中切到其他页 或 自动推图后台执行：隐藏战斗面板，显示content
     battlePanel.style.display='none';
     contentEl.style.display='';
   }else{
