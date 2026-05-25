@@ -82,6 +82,44 @@ body{background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingF
 .merge-mythic-particles::after{right:25%;top:40%;animation-delay:.5s}
 @keyframes particleFloat{0%{opacity:0;transform:translateY(20px) scale(0)}50%{opacity:1;transform:translateY(-20px) scale(1)}100%{opacity:0;transform:translateY(-60px) scale(.5)}}
 
+
+/* ===== 城镇仪表盘样式 ===== */
+.town-header{background:linear-gradient(135deg,rgba(201,162,39,.15),rgba(142,68,173,.1));border:1px solid rgba(201,162,39,.3);border-radius:12px;padding:16px;margin-bottom:12px}
+.town-title{color:var(--gold);font-size:18px;font-weight:bold;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.town-title .icon{font-size:24px}
+.town-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px;margin-bottom:12px}
+.town-stat{background:rgba(0,0,0,.3);border-radius:8px;padding:8px;text-align:center}
+.town-stat-value{font-size:16px;font-weight:bold;color:var(--gold)}
+.town-stat-label{font-size:10px;color:var(--text2);margin-top:2px}
+.town-progress{background:rgba(0,0,0,.2);border-radius:6px;padding:10px;margin-bottom:8px}
+.town-progress-bar{height:8px;background:#111;border-radius:4px;overflow:hidden;margin-top:6px}
+.town-progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),#f39c12);border-radius:4px;transition:width .3s}
+.town-quick-actions{display:flex;gap:6px;flex-wrap:wrap}
+.town-quick-btn{flex:1;min-width:90px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .2s;text-align:center}
+.town-quick-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.town-quick-btn.primary{background:linear-gradient(135deg,var(--gold),#f39c12);color:#111}
+.town-quick-btn.danger{background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff}
+.town-quick-btn.info{background:linear-gradient(135deg,var(--blue),#2980b9);color:#fff}
+.town-module-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+@media(max-width:500px){.town-module-grid{grid-template-columns:repeat(2,1fr)}}
+.town-module{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
+.town-module::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;opacity:0;transition:opacity .2s}
+.town-module:hover::before{opacity:1}
+.town-module:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.3)}
+.town-module-icon{font-size:28px;margin-bottom:6px}
+.town-module-name{font-size:13px;font-weight:bold;color:var(--gold);margin-bottom:4px}
+.town-module-desc{font-size:10px;color:var(--text2);line-height:1.4}
+.town-module-badge{position:absolute;top:6px;right:6px;background:rgba(231,76,60,.2);color:#e74c3c;font-size:9px;padding:2px 6px;border-radius:4px;font-weight:bold}
+.town-module-action{font-size:11px;color:var(--blue);margin-top:6px;font-weight:600}
+.town-battle-module::before{background:linear-gradient(90deg,#e74c3c,#c0392b)}
+.town-hero-module::before{background:linear-gradient(90deg,#3498db,#2980b9)}
+.town-team-module::before{background:linear-gradient(90deg,#2ecc71,#27ae60)}
+.town-merge-module::before{background:linear-gradient(90deg,#9b59b6,#8e44ad)}
+.town-equip-module::before{background:linear-gradient(90deg,#e67e22,#d35400)}
+.town-build-module::before{background:linear-gradient(90deg,#1abc9c,#16a085)}
+.town-footer{display:flex;gap:8px;flex-wrap:wrap}
+.town-footer .btn{flex:1;min-width:100px}
+
 /* ===== 英雄卡片 ===== */
 .hero-card{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;cursor:pointer;transition:all .25s ease;display:flex;gap:10px;position:relative;overflow:hidden}
 .hero-card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;opacity:0;transition:opacity .25s}
@@ -3932,88 +3970,80 @@ function renderTown(el){
   var offline=calculateOfflineEarnings();
   if(offline) G.offlineEarnings=offline;
   
-  el.innerHTML=`
-    <!-- 离线收益横幅 -->
-    ${G.offlineEarnings?`
-    <div class="daily-bonus-banner" style="cursor:pointer;background:linear-gradient(135deg,rgba(100,200,255,.15),rgba(50,150,255,.05));border-color:rgba(100,200,255,.3)" onclick="claimOfflineEarnings()">
-      <span style="font-size:16px">💤</span> 离线收益可领取！离线 ${G.offlineEarnings.hours.toFixed(1)} 小时<br>
-      <span class="text-xs">💰${G.offlineEarnings.gold} 🍞${G.offlineEarnings.food} 🪨${G.offlineEarnings.stone} ⛏️${G.offlineEarnings.iron}</span>
-    </div>
-    `:''}
-    <!-- 每日奖励横幅 -->
-    ${!G.dailyBonusClaimed?`
-    <div class="daily-bonus-banner" style="cursor:pointer" onclick="claimDailyBonus()">
-      <span style="font-size:16px">🎁</span> 点击领取每日登录奖励！<br>
-      <span class="text-xs text-dim">随进度提升：约${200+G.stageProgress*30}💰 ${100+G.stageProgress*10}🍞 ${30+G.stageProgress*5}🪨 ${15+G.stageProgress*3}⛏️</span>
-    </div>
-    `:''}
-    <div class="panel">
-      <div class="panel-title"><span class="icon">🏰</span> 暗影地牢</div>
-      <div style="color:var(--text2);font-size:12px;line-height:1.8">
-        <p>黑暗笼罩了这片大陆。曾经繁荣的帝国已经覆灭，亡灵和恶魔在废墟中游荡。</p>
-        <p>你是最后的希望——一位流浪的指挥官，必须召集英雄，探索地牢，击败黑暗势力。</p>
-        <p style="margin-top:8px;color:var(--gold)">当前进度：第 ${G.stageProgress-1} 章已通关（无限模式）</p>
-        <p style="color:var(--text2)">下一关：${nextStage.icon+' '+nextStage.name}</p>
-        ${G.pveWinStreak>=3?`<p style="color:#ff6b00">🔥 当前PVE连胜: ${G.pveWinStreak} 连 | 最高: ${G.pveMaxStreak} 连</p>`:''}
-        ${G.pveMaxStreak>=5?`<p style="color:var(--gold)">🏆 历史最佳: ${G.pveMaxStreak} 连胜！</p>`:''}
-      </div>
-    </div>
-    <div class="grid-2">
-      <div class="panel" style="cursor:pointer" onclick="switchTab('heroes')">
-        <div class="panel-title"><span class="icon">⚔️</span> 英雄管理</div>
-        <div class="text-dim text-sm">管理你的英雄，查看属性和技能</div>
-        <div style="margin-top:8px;color:var(--gold)">共 ${G.heroes.length} 位英雄</div>
-      </div>
-      <div class="panel" style="cursor:pointer" onclick="switchTab('team')">
-        <div class="panel-title"><span class="icon">🛡️</span> 队伍编成</div>
-        <div class="text-dim text-sm">编组你的战斗队伍（最多6人）</div>
-        <div style="margin-top:8px;color:var(--gold)">已编入 ${G.team.filter(t=>t!==null).length}/6</div>
-      </div>
-      <div class="panel" style="cursor:pointer" onclick="switchTab('battle')">
-        <div class="panel-title"><span class="icon">💀</span> 出征战斗</div>
-        <div class="text-dim text-sm">选择关卡，自动战斗</div>
-        <div style="margin-top:8px;color:var(--gold)">下一关：${nextStage?nextStage.name:'已全部通关'}</div>
-      </div>
-      <div class="panel" style="cursor:pointer" onclick="switchTab('merge')">
-        <div class="panel-title"><span class="icon">⚗️</span> 英雄合成</div>
-        <div class="text-dim text-sm">融合英雄，创造更强力的存在</div>
-        <div style="margin-top:8px;color:var(--gold)">已发现 ${MERGE_RECIPES.length} 种配方</div>
-      </div>
-      <div class="panel" style="cursor:pointer" onclick="switchTab('equip')">
-        <div class="panel-title"><span class="icon">🗡️</span> 装备管理</div>
-        <div class="text-dim text-sm">为英雄配备强力装备</div>
-        <div style="margin-top:8px;color:var(--gold)">背包 ${G.equipment.filter(e=>e.heroUid===null).length} 件装备</div>
-      </div>
-      <div class="panel" style="cursor:pointer" onclick="switchTab('buildings')">
-        <div class="panel-title"><span class="icon">🏗️</span> 城镇建筑</div>
-        <div class="text-dim text-sm">升级建筑，解锁更多功能</div>
-        <div style="margin-top:8px;color:var(--gold)">酒馆 Lv.${G.buildings.tavern} | 铁匠铺 Lv.${G.buildings.blacksmith}</div>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="panel-title"><span class="icon">⚔️</span> 自动推图</div>
-      <div class="text-dim text-sm mb-8">从当前关卡开始，自动战斗直到失败</div>
-      <div class="btn-group">
-        <button class="btn btn-primary" onclick="startAutoBattle(G.stageProgress)">▶️ 开始自动推图</button>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="panel-title"><span class="icon">📜</span> 快速招募</div>
-      <div class="text-dim text-sm mb-8">在酒馆招募新英雄（品质受酒馆等级影响）</div>
-      <div class="btn-group">
-        <button class="btn btn-primary" onclick="renderTavernRecruit()">🍺 前往酒馆</button>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="panel-title"><span class="icon">💾</span> 存档管理</div>
-      <div class="text-dim text-sm mb-8">保存或读取游戏进度</div>
-      <div class="btn-group">
-        <button class="btn btn-primary" onclick="saveGame()">💾 保存游戏</button>
-        <button class="btn" onclick="loadGame();updateResUI();renderCurrentTab();showToast('📂 已读档');">📂 读取存档</button>
-        <button class="btn" style="color:#ff6b6b" onclick="deleteSave()">🗑️ 删除存档</button>
-      </div>
-    </div>
-  `;
+  // 计算队伍战力
+  var teamPower=G.team.filter(t=>t).reduce(function(s,t){return s+calcHeroPower(t)},0);
+  var heroCount=G.heroes.length;
+  var equipCount=G.equipment.filter(function(e){return e.heroUid===null}).length;
+  var teamCount=G.team.filter(function(t){return t!==null}).length;
+  
+  // 横幅
+  var bannersHtml='';
+  if(G.offlineEarnings){
+    bannersHtml+='<div class="daily-bonus-banner" onclick="claimOfflineEarnings()" style="cursor:pointer;background:linear-gradient(135deg,rgba(100,200,255,.15),rgba(50,150,255,.05));border-color:rgba(100,200,255,.3)">'
+      +'<span style="font-size:16px">💤</span> 离线收益可领取！离线 '+G.offlineEarnings.hours.toFixed(1)+' 小时'
+      +'<span class="text-xs" style="margin-left:8px">💰'+G.offlineEarnings.gold+' 🍞'+G.offlineEarnings.food+' 🪨'+G.offlineEarnings.stone+' ⛏️'+G.offlineEarnings.iron+'</span>'
+      +'</div>';
+  }
+  if(!G.dailyBonusClaimed){
+    bannersHtml+='<div class="daily-bonus-banner" onclick="claimDailyBonus()" style="cursor:pointer">'
+      +'<span style="font-size:16px">🎁</span> 点击领取每日登录奖励！'
+      +'<span class="text-xs text-dim" style="margin-left:8px">约'+(200+G.stageProgress*30)+'💰 '+(100+G.stageProgress*10)+'🍞 '+(30+G.stageProgress*5)+'🪨 '+(15+G.stageProgress*3)+'⛏️</span>'
+      +'</div>';
+  }
+  
+  // 模块数据
+  var modules=[
+    {id:'battle',cls:'town-battle-module',icon:'💀',name:'出征战斗',desc:'挑战关卡，击败敌人',action:nextStage?nextStage.icon+' '+nextStage.name:'已全部通关',badge:null},
+    {id:'heroes',cls:'town-hero-module',icon:'⚔️',name:'英雄管理',desc:'管理英雄，查看属性',action:heroCount+' 位英雄',badge:heroCount>0?null:'去酒馆!'},
+    {id:'team',cls:'town-team-module',icon:'🛡️',name:'队伍编成',desc:'编组战斗队伍',action:teamCount+'/6 已编入',badge:teamCount<3?'需编队':null},
+    {id:'merge',cls:'town-merge-module',icon:'⚗️',name:'英雄合成',desc:'融合创造更强英雄',action:MERGE_RECIPES.length+' 种配方',badge:null},
+    {id:'equip',cls:'town-equip-module',icon:'🗡️',name:'装备管理',desc:'配备强化装备',action:equipCount+' 件待装备',badge:equipCount>0?'可穿戴':null},
+    {id:'buildings',cls:'town-build-module',icon:'🏗️',name:'城镇建筑',desc:'升级解锁功能',action:'酒馆 Lv.'+G.buildings.tavern,badge:null}
+  ];
+  var modulesHtml=modules.map(function(m){
+    return '<div class="town-module '+m.cls+'" onclick="switchTab(&quot;'+m.id+'&quot;)">'
+      +(m.badge?'<div class="town-module-badge">'+m.badge+'</div>':'')
+      +'<div class="town-module-icon">'+m.icon+'</div>'
+      +'<div class="town-module-name">'+m.name+'</div>'
+      +'<div class="town-module-desc">'+m.desc+'</div>'
+      +'<div class="town-module-action">'+m.action+' →</div>'
+      +'</div>';
+  }).join('');
+  
+  // 底部按钮
+  var footerHtml='<div class="town-footer">'
+    +'<button class="btn btn-primary" onclick="startAutoBattle(G.stageProgress)">▶️ 自动推图</button>'
+    +'<button class="btn" onclick="renderTavernRecruit()">🍺 酒馆</button>'
+    +'<button class="btn" onclick="switchTab(&quot;codex&quot;)">📖 图鉴</button>'
+    +'<button class="btn" onclick="if(G_cheats.unlocked){switchTab(&quot;cheats&quot;)}else{showToast(&quot;金手指未解锁&quot;)}">🔧</button>'
+    +'</div>'
+    +'<div class="town-footer" style="margin-top:8px">'
+    +'<button class="btn" style="flex:0;white-space:nowrap" onclick="saveGame()">💾</button>'
+    +'<button class="btn" style="flex:0;white-space:nowrap" onclick="loadGame();updateResUI();renderCurrentTab();showToast(\'📂 已读档\');">📂</button>'
+    +'</div>';
+  
+  el.innerHTML=bannersHtml+'<div class="town-header">'
+    +'<div class="town-title"><span class="icon">🏰</span> 暗影地牢 <span style="font-size:12px;color:var(--text2);font-weight:normal;margin-left:auto">第 '+(G.stageProgress-1)+' 章</span></div>'
+    +'<div class="town-stats">'
+      +'<div class="town-stat"><div class="town-stat-value">'+G.gold.toLocaleString()+'</div><div class="town-stat-label">💰 金币</div></div>'
+      +'<div class="town-stat"><div class="town-stat-value">'+G.gems+'</div><div class="town-stat-label">💎 宝石</div></div>'
+      +'<div class="town-stat"><div class="town-stat-value">'+teamPower+'</div><div class="town-stat-label">⚡ 战力</div></div>'
+      +'<div class="town-stat"><div class="town-stat-value" style="color:'+(G.pveWinStreak>=3?'#ff6b00':'var(--text)')+'">'+(G.pveWinStreak||0)+'</div><div class="town-stat-label">🔥 连胜</div></div>'
+    +'</div>'
+    +'<div class="town-progress">'
+      +'<div style="display:flex;justify-content:space-between;font-size:11px"><span>下一关</span><span>'+nextStage.icon+' '+nextStage.name+'</span></div>'
+      +'<div class="town-progress-bar"><div class="town-progress-fill" style="width:'+Math.min(100,(G.stageProgress/50)*100)+'%"></div></div>'
+    +'</div>'
+    +'<div class="town-quick-actions">'
+      +'<button class="town-quick-btn primary" onclick="startAutoBattle(G.stageProgress)">▶️ 自动推图</button>'
+      +'<button class="town-quick-btn info" onclick="renderTavernRecruit()">🍺 招募</button>'
+      +'<button class="town-quick-btn" onclick="switchTab(&quot;heroes&quot;)">⚔️ 英雄</button>'
+      +'<button class="town-quick-btn" onclick="switchTab(&quot;team&quot;)">🛡️ 编队</button>'
+    +'</div>'
+    +'</div>'
+    +'<div class="town-module-grid">'+modulesHtml+'</div>'
+    +footerHtml
+    +'';
 }
 
 function renderTavernRecruit(){
