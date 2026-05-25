@@ -45,20 +45,38 @@ body{background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingF
 .panel-title .icon{font-size:16px}
 
 /* ===== 英雄卡片 ===== */
-.hero-card{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:6px;cursor:pointer;transition:all .2s;display:flex;gap:8px}
-.hero-card:active{border-color:var(--gold);transform:translateX(2px)}
-.hero-card.selected{border-color:var(--gold);box-shadow:0 0 6px rgba(201,162,39,.3)}
-.hero-avatar{width:44px;height:44px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;border:2px solid var(--border)}
+.hero-card{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;cursor:pointer;transition:all .25s ease;display:flex;gap:10px;position:relative;overflow:hidden}
+.hero-card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;opacity:0;transition:opacity .25s}
+.hero-card:hover::before{opacity:1}
+.hero-card:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.hero-card:active{transform:translateY(0);box-shadow:none}
+.hero-card.selected{border-color:var(--gold);box-shadow:0 0 8px rgba(201,162,39,.3)}
+.quality-common::before{background:linear-gradient(90deg,#888,#666)}
+.quality-rare::before{background:linear-gradient(90deg,#4a9eff,#2980b9)}
+.quality-epic::before{background:linear-gradient(90deg,#a855f7,#8e44ad)}
+.quality-legendary::before{background:linear-gradient(90deg,#f59e0b,#d97706)}
+.quality-mythic::before{background:linear-gradient(90deg,#ef4444,#dc2626)}
+.quality-rare{border-color:rgba(74,158,255,.35)!important}
+.quality-epic{border-color:rgba(168,85,247,.35)!important}
+.quality-legendary{border-color:rgba(245,158,11,.35)!important;box-shadow:inset 0 0 20px rgba(245,158,11,.05)}
+.quality-mythic{border-color:rgba(239,68,68,.35)!important;box-shadow:inset 0 0 20px rgba(239,68,68,.05)}
+.hero-avatar{width:48px;height:48px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;border:2px solid var(--border);position:relative;transition:all .25s}
+.hero-card:hover .hero-avatar{transform:scale(1.05)}
 .hero-info{flex:1;min-width:0}
-.hero-name{font-size:13px;font-weight:bold;color:var(--gold)}
-.hero-meta{font-size:10px;color:var(--text2);margin-top:1px}
-.hero-stats{font-size:10px;color:var(--text2);margin-top:3px;display:flex;gap:6px;flex-wrap:wrap}
-.hero-skills{font-size:10px;margin-top:3px;display:flex;gap:3px;flex-wrap:wrap}
-.skill-tag{background:rgba(41,128,185,.2);color:var(--blue);padding:1px 5px;border-radius:3px;font-size:9px}
-.stat-tag{color:var(--text2)}
-.stat-tag b{color:var(--text)}
-.bar-wrap{height:3px;background:#111;border-radius:2px;margin-top:2px;overflow:hidden}
+.hero-name{font-size:13px;font-weight:bold;color:var(--gold);display:flex;align-items:center;gap:4px}
+.hero-meta{font-size:10px;color:var(--text2);margin-top:2px}
+.hero-stats{font-size:10px;color:var(--text2);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap}
+.hero-skills{font-size:10px;margin-top:4px;display:flex;gap:3px;flex-wrap:wrap}
+.skill-tag{background:rgba(41,128,185,.15);color:var(--blue);padding:2px 6px;border-radius:4px;font-size:9px;border:1px solid rgba(41,128,185,.2);transition:all .2s}
+.skill-tag:hover{background:rgba(41,128,185,.3)}
+.stat-tag{color:var(--text2);display:inline-flex;align-items:center;gap:2px}
+.stat-tag b{color:var(--text);font-weight:600}
+.bar-wrap{height:4px;background:#111;border-radius:2px;margin-top:4px;overflow:hidden}
 .bar-fill{height:100%;border-radius:2px;transition:width .3s}
+.hero-team-badge{position:absolute;top:6px;right:6px;background:rgba(39,174,96,.2);color:#2ed573;font-size:9px;padding:2px 6px;border-radius:4px;border:1px solid rgba(39,174,96,.3);font-weight:bold}
+.hero-level-badge{position:absolute;bottom:-2px;right:-2px;background:#111;border:1px solid var(--border);border-radius:4px;padding:0 4px;font-size:8px;color:var(--gold);font-weight:bold}
+.hero-power{font-size:10px;color:var(--text3);margin-top:2px}
+.hero-power b{color:var(--gold);font-size:11px}
 
 /* 品质颜色 */
 .quality-common{border-color:#888!important}
@@ -66,7 +84,7 @@ body{background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingF
 .quality-epic{border-color:#a855f7!important}
 .quality-legendary{border-color:#f59e0b!important}
 .quality-mythic{border-color:#ef4444!important}
-.q-common{color:#888}.q-rare{color:#4a9eff}.q-epic{color:#a855f7}.q-legendary{color:#f59e0b}.q-mythic{color:#ef4444}
+.q-common{color:#999}.q-rare{color:#5bb5ff}.q-epic{color:#b86eff}.q-legendary{color:#ffb833;text-shadow:0 0 8px rgba(255,184,51,.3)}.q-mythic{color:#ff5555;text-shadow:0 0 8px rgba(255,85,85,.3)}
 
 /* ===== 按钮 ===== */
 .btn{padding:7px 16px;border:1px solid var(--border);background:var(--panel2);color:var(--text);cursor:pointer;border-radius:6px;font-size:13px;transition:all .2s;font-family:inherit;touch-action:manipulation}
@@ -3912,6 +3930,28 @@ function renderTavernRecruit(){
   `;
 }
 
+
+// ==================== 战力计算 ====================
+function calcHeroPower(h){
+  var s=getHeroStats(h);
+  return Math.floor(s.maxHP*0.5+s.atk*3+s.def*2.5+s.spd*2+s.maxMP*0.3);
+}
+
+// 战力排序切换
+function toggleHeroSort(){
+  window._heroSortDesc=!window._heroSortDesc;
+  var btn=document.getElementById('hero-sort-btn');
+  if(btn)btn.textContent=window._heroSortDesc?'📊战力↓':'📊战力↑';
+  var list=document.getElementById('hero-list');
+  if(!list)return;
+  var cards=Array.from(list.children);
+  cards.sort(function(a,b){
+    var pa=parseInt(a.querySelector('.hero-power b')?.textContent)||0;
+    var pb=parseInt(b.querySelector('.hero-power b')?.textContent)||0;
+    return window._heroSortDesc?pb-pa:pa-pb;
+  });
+  cards.forEach(function(c){list.appendChild(c)});
+}
 function renderHeroes(el){
   if(G.heroes.length===0){
     el.innerHTML=`<div class="panel"><div class="panel-title"><span class="icon">⚔️</span> 英雄列表</div><div class="text-dim">还没有英雄，去酒馆招募吧！</div><div class="btn-group mt-8"><button class="btn btn-primary" onclick="renderTavernRecruit()">🍺 前往酒馆</button></div></div>`;
@@ -3924,9 +3964,12 @@ function renderHeroes(el){
   el.innerHTML=`
     <div class="panel">
       <div class="panel-title"><span class="icon">⚔️</span> 英雄列表 (${G.heroes.length})</div>
-      <div class="tab-bar">
+      <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
         <button class="tab-btn active" onclick="filterHeroes('all',this)">全部</button>
-        ${Object.entries(ROLES).map(([k,v])=>`<button class="tab-btn" onclick="filterHeroes('${k}',this)">${v.icon}${v.name}</button>`).join('')}
+        <button class="tab-btn" onclick="filterHeroes('team',this)">🛡️队伍</button>
+        ${["rare","epic","legendary","mythic"].map(q=>`<button class="tab-btn" onclick="filterHeroes('${q}',this)">${QUALITY_NAMES[q]}</button>`).join('')}
+        <span style="flex:1"></span>
+        <button class="tab-btn" onclick="toggleHeroSort()" id="hero-sort-btn">📊战力↓</button>
       </div>
       <div id="hero-list">
         ${sorted.map(h=>renderHeroCard(h)).join('')}
@@ -3960,8 +4003,10 @@ function renderHeroCard(h){
     spd:'速度 - 决定行动顺序',
     maxMP:'魔法值 - 释放技能消耗'
   };
-  return`<div class="hero-card quality-${h.quality}" data-role="${h.role}" onclick="showHeroDetail(${h.uid})" style="cursor:pointer">
-    <div class="hero-avatar" style="background:rgba(${h.quality==='common'?'100,100,100':h.quality==='rare'?'50,100,200':h.quality==='epic'?'130,50,200':h.quality==='legendary'?'200,150,30':'200,50,50'},.15)">
+  var power=calcHeroPower(h);
+  return`<div class="hero-card quality-${h.quality}" data-role="${h.role}" data-quality="${h.quality}" data-uid="${h.uid}" onclick="showHeroDetail(${h.uid})" style="cursor:pointer">
+    ${inTeam?'<div class="hero-team-badge">🛡️ 队伍中</div>':''}
+    <div class="hero-avatar" style="background:rgba(${h.quality==='common'?'100,100,100':h.quality==='rare'?'50,120,220':h.quality==='epic'?'140,50,220':h.quality==='legendary'?'220,160,30':'220,50,50'},.2)">
       ${h.icon}
     </div>
     <div class="hero-info">
@@ -3977,6 +4022,7 @@ function renderHeroCard(h){
       </div>
       <div class="bar-wrap"><div class="bar-fill" style="width:${(h.exp/expNeed)*100}%;background:var(--exp-bar)"></div></div>
       <div class="text-xs text-dim">EXP: ${h.exp}/${expNeed}</div>
+      <div class="hero-power">⚡战力: <b>${power}</b></div>
       <div class="hero-skills">${allSkills.map(sid=>{const sk=SKILLS[sid];return sk?`<span class="skill-tag" title="${sk.desc}">${sk.icon}${sk.name}</span>`:''}).join('')}</div>
       ${h.traits&&h.traits.length>0?`<div class="mt-4" style="display:flex;flex-wrap:wrap;gap:2px">${h.traits.map(t=>`<span class="trait-tag" title="${t.desc}">${t.icon}${t.name}</span>`).join('')}</div>`:''}
       <div class="text-xs text-dim mt-4" style="font-style:italic">"${h.lore}"</div>
@@ -4044,16 +4090,38 @@ function showHeroDetail(uid){
       </div>
       `:''}
       <div class="text-xs text-dim" style="font-style:italic;text-align:center">"${h.lore}"</div>
+      <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="closeModal();switchTab('team')">🛡️ 编队</button>
+        <button class="btn btn-sm" onclick="closeModal();switchTab('equip')">🗡️ 装备</button>
+        <button class="btn btn-sm" style="color:#ff6b6b" onclick="dismissHero('${h.uid}')">🗑️ 遣散</button>
+      </div>
     </div>`;
   openModal(html);
 }
 
-function filterHeroes(role,btn){
+// 遣散英雄
+function dismissHero(uid){
+  var idx=G.heroes.findIndex(h=>h.uid===uid);
+  if(idx<0)return;
+  var h=G.heroes[idx];
+  G.team=G.team.map(t=>(t&&t.uid===uid)?null:t);
+  G.heroes.splice(idx,1);
+  closeModal();
+  renderCurrentTab();
+  saveGame();
+  showToast('已遣散 '+h.icon+h.name);
+}
+
+function filterHeroes(filter,btn){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  document.querySelectorAll('.hero-card').forEach(card=>{
-    if(role==='all')card.style.display='';
-    else card.style.display=card.dataset.role===role?'':'none';
+  document.querySelectorAll('#hero-list .hero-card').forEach(card=>{
+    var show=true;
+    if(filter==='all')show=true;
+    else if(filter==='team')show=G.team.some(t=>t&&t.uid===parseInt(card.dataset.uid));
+    else if(['rare','epic','legendary','mythic'].includes(filter))show=card.dataset.quality===filter;
+    else show=card.dataset.role===filter;
+    card.style.display=show?'':'none';
   });
 }
 
