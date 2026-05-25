@@ -3356,25 +3356,30 @@ function generateFusedHero(heroes){
   // 2. 判定特殊结果（优先级：神话 > 传说 > 品质+1 > 异变 > 普通）
   // 金手指强制异变
   var isMutation=G_cheats.forceMutation||Math.random()<G_MUTATION_RATE;
+  var isQualityUp=false;
+  var isDirectLegendary=false;
+  var isDirectMythic=false;
   
   // 1% 直接神话（最高优先级，无视当前品质）
-  var isDirectMythic=Math.random()<G_MYTHIC_DIRECT_RATE;
-  if(isDirectMythic){
+  if(Math.random()<G_MYTHIC_DIRECT_RATE){
     newQuality='mythic';
     newQIdx=QUALITIES.indexOf('mythic');
-    isMutation=true; // 神话必定异变
+    isMutation=true;
+    isDirectMythic=true;
   }
   // 3% 直接传说（无视当前品质，但低于神话优先级）
   else if(Math.random()<G_LEGENDARY_DIRECT_RATE){
     newQuality='legendary';
     newQIdx=QUALITIES.indexOf('legendary');
-    isMutation=true; // 传说必定异变
+    isMutation=true;
+    isDirectLegendary=true;
   }
   // 5% 品质+1（不超过神话）
   else if(Math.random()<G_QUALITY_UP_RATE && newQIdx<QUALITIES.length-1){
     newQIdx++;
     newQuality=QUALITIES[newQIdx];
-    isMutation=true; // 品质提升必定异变
+    isMutation=true;
+    isQualityUp=true;
   }
   
   // 3. 确定新职业：基于哈希从输入英雄职业中选
@@ -3400,31 +3405,63 @@ function generateFusedHero(heroes){
   var shuffled=allSkillPool.slice().sort(function(){return Math.random()-0.5});
   var newSkills=shuffled.slice(0,skillCount);
   
-  // 5. 确定新属性：从材料英雄中随机继承（而非取最高值）
-  var randIdx=Math.floor(Math.random()*heroes.length);
-  var maxHP=heroes[randIdx].maxHP;
-  randIdx=Math.floor(Math.random()*heroes.length);
-  var atk=heroes[randIdx].atk;
-  randIdx=Math.floor(Math.random()*heroes.length);
-  var def=heroes[randIdx].def;
-  randIdx=Math.floor(Math.random()*heroes.length);
-  var spd=heroes[randIdx].spd;
-  randIdx=Math.floor(Math.random()*heroes.length);
-  var maxMP=heroes[randIdx].maxMP;
+  // 5. 确定新属性
+  var roleData=ROLES[mainRole];
+  var baseHP=roleData?roleData.baseHP:100;
+  var baseATK=roleData?roleData.baseATK:15;
+  var baseDEF=roleData?roleData.baseDEF:10;
+  var baseSPD=roleData?roleData.baseSPD:10;
+  var baseMP=roleData?roleData.baseMP:40;
   
-  // 属性计算：非异变时保持继承值，异变时提升
-  if(isMutation){
-    // 异变：取同品质和+1品质之间的倍率
+  // 计算材料英雄的平均等级
+  var avgLevel=Math.floor(heroes.reduce(function(s,h){return s+h.level},0)/heroes.length);
+  var maxLevel=Math.max.apply(null,heroes.map(function(h){return h.level}));
+  
+  // 品质提升或异变时：基于新品质标准重新计算属性
+  // 普通合成：继承材料属性（取平均值）
+  var maxHP,atk,def,spd,maxMP;
+  
+  if(isQualityUp||isDirectLegendary||isDirectMythic){
+    // 品质大幅提升：基于新品质标准计算，确保数值达标
+    var qm=QUALITY_MULT[newQuality];
+    maxHP=calcStat(baseHP,qm,maxLevel);
+    atk=calcStat(baseATK,qm,maxLevel);
+    def=calcStat(baseDEF,qm,maxLevel);
+    spd=calcStat(baseSPD,qm,maxLevel);
+    maxMP=calcStat(baseMP,qm,maxLevel);
+    
+    // 额外加成：取材料中该属性的最高值作为参考，确保不弱于材料
+    var maxMaterialHP=Math.max.apply(null,heroes.map(function(h){return h.maxHP}));
+    var maxMaterialATK=Math.max.apply(null,heroes.map(function(h){return h.atk}));
+    var maxMaterialDEF=Math.max.apply(null,heroes.map(function(h){return h.def}));
+    var maxMaterialSPD=Math.max.apply(null,heroes.map(function(h){return h.spd}));
+    var maxMaterialMP=Math.max.apply(null,heroes.map(function(h){return h.maxMP}));
+    
+    // 最终属性 = max(新标准, 材料最高值 * 1.1) 确保有提升
+    maxHP=Math.max(maxHP,Math.floor(maxMaterialHP*1.1));
+    atk=Math.max(atk,Math.floor(maxMaterialATK*1.1));
+    def=Math.max(def,Math.floor(maxMaterialDEF*1.1));
+    spd=Math.max(spd,Math.floor(maxMaterialSPD*1.1));
+    maxMP=Math.max(maxMP,Math.floor(maxMaterialMP*1.1));
+  }else if(isMutation){
+    // 普通异变（同品质）：取材料最高属性 * 异变加成
     var qm=QUALITY_MULT[newQuality];
     var nextQm=QUALITIES.indexOf(newQuality)<QUALITIES.length-1?QUALITY_MULT[QUALITIES[QUALITIES.indexOf(newQuality)+1]]:qm;
-    var mutMult=1.0+(nextQm/qm-1.0)*0.5; // 取中间值比例
-    maxHP=Math.floor(maxHP*mutMult);
-    atk=Math.floor(atk*mutMult);
-    def=Math.floor(def*mutMult);
-    spd=Math.floor(spd*mutMult);
-    maxMP=Math.floor(maxMP*mutMult);
+    var mutMult=1.0+(nextQm/qm-1.0)*0.5;
+    
+    maxHP=Math.floor(Math.max.apply(null,heroes.map(function(h){return h.maxHP}))*mutMult);
+    atk=Math.floor(Math.max.apply(null,heroes.map(function(h){return h.atk}))*mutMult);
+    def=Math.floor(Math.max.apply(null,heroes.map(function(h){return h.def}))*mutMult);
+    spd=Math.floor(Math.max.apply(null,heroes.map(function(h){return h.spd}))*mutMult);
+    maxMP=Math.floor(Math.max.apply(null,heroes.map(function(h){return h.maxMP}))*mutMult);
+  }else{
+    // 普通合成：继承材料属性（取平均值）
+    maxHP=Math.floor(heroes.reduce(function(s,h){return s+h.maxHP},0)/heroes.length);
+    atk=Math.floor(heroes.reduce(function(s,h){return s+h.atk},0)/heroes.length);
+    def=Math.floor(heroes.reduce(function(s,h){return s+h.def},0)/heroes.length);
+    spd=Math.floor(heroes.reduce(function(s,h){return s+h.spd},0)/heroes.length);
+    maxMP=Math.floor(heroes.reduce(function(s,h){return s+h.maxMP},0)/heroes.length);
   }
-  // 非异变：保持继承的属性值不变
   
   // 6. 生成名称和图标
   var namePrefixes={
