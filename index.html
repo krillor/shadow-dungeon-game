@@ -3970,11 +3970,12 @@ function renderTown(el){
   var offline=calculateOfflineEarnings();
   if(offline) G.offlineEarnings=offline;
   
-  // 计算队伍战力
-  var teamPower=G.team.filter(t=>t).reduce(function(s,t){return s+calcHeroPower(t)},0);
+  // 计算队伍战力（防护：确保team和buildings存在）
+  var teamPower=(G.team||[]).filter(function(t){return t}).reduce(function(s,t){return s+calcHeroPower(t)},0);
   var heroCount=G.heroes.length;
-  var equipCount=G.equipment.filter(function(e){return e.heroUid===null}).length;
-  var teamCount=G.team.filter(function(t){return t!==null}).length;
+  var equipCount=(G.equipment||[]).filter(function(e){return e.heroUid===null}).length;
+  var teamCount=(G.team||[]).filter(function(t){return t!==null}).length;
+  G.buildings=G.buildings||{};
   
   // 横幅
   var bannersHtml='';
