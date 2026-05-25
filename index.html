@@ -1316,7 +1316,7 @@ const EXPLORE_EVENTS = [
     }},
 ];
 
-function triggerExploreEvent(){
+function triggerExploreEvent(logFn){
   // 30%概率触发探索事件
   if(Math.random()>0.30) return false;
   G.exploreStats.totalEvents++;
@@ -1330,9 +1330,11 @@ function triggerExploreEvent(){
     if(r<acc){event=EXPLORE_EVENTS[i];break}
   }
   var result=event.effect();
-  log('\n🌟 探索事件: '+event.icon+' '+event.name,'title');
-  log('  '+event.desc,'info');
-  log('  '+result,'skill');
+  if(logFn){
+    logFn('\n🌟 探索事件: '+event.icon+' '+event.name,'title');
+    logFn('  '+event.desc,'info');
+    logFn('  '+result,'skill');
+  }
   saveGame();
   return true;
 }
@@ -2876,7 +2878,7 @@ async function runBattle(stageId){
     log('—— 第 '+round+' 回合 ——','title');
     // 每3回合有概率触发探索事件（地下城堡风格）
     if(round%3===0 && round<maxRounds-2){
-      triggerExploreEvent();
+      triggerExploreEvent(log);
       await sleep(200);
     }
     await sleep(300);
