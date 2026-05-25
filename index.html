@@ -44,6 +44,44 @@ body{background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingF
 .panel-title{color:var(--gold);font-size:14px;font-weight:bold;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px}
 .panel-title .icon{font-size:16px}
 
+
+/* ===== 合成结果展示 ===== */
+.merge-result-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:300;display:flex;align-items:center;justify-content:center;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.merge-result-card{background:var(--panel);border:2px solid var(--gold);border-radius:16px;padding:24px;max-width:360px;width:90%;text-align:center;position:relative;animation:cardPop .5s cubic-bezier(.34,1.56,.64,1)}
+@keyframes cardPop{0%{opacity:0;transform:scale(.3) translateY(50px)}70%{transform:scale(1.05) translateY(-10px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+.merge-result-avatar{width:100px;height:100px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:56px;margin:0 auto 16px;position:relative;border:3px solid var(--border);animation:avatarGlow 1.5s ease infinite alternate}
+@keyframes avatarGlow{from{box-shadow:0 0 20px rgba(201,162,39,.3)}to{box-shadow:0 0 40px rgba(201,162,39,.6)}}
+.merge-result-quality{font-size:14px;font-weight:bold;margin-bottom:8px}
+.merge-result-name{font-size:20px;font-weight:900;color:var(--gold);margin-bottom:12px;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+.merge-result-mutation{color:#a855f7;font-size:12px;font-weight:bold;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:4px}
+.merge-result-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0;padding:12px;background:rgba(0,0,0,.3);border-radius:8px}
+.merge-result-stat{font-size:11px;color:var(--text2)}
+.merge-result-stat b{display:block;color:var(--text);font-size:14px;margin-top:2px}
+.merge-result-skills{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin:12px 0}
+.merge-result-skill{background:rgba(41,128,185,.2);color:var(--blue);padding:3px 8px;border-radius:4px;font-size:10px;border:1px solid rgba(41,128,185,.3)}
+/* 异变特效 */
+.merge-mutation-flash{position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at center,rgba(168,85,247,.5),transparent 70%);pointer-events:none;z-index:299;animation:mutationFlash 1.2s ease-out forwards}
+@keyframes mutationFlash{0%{opacity:0}20%{opacity:1}60%{opacity:.5}100%{opacity:0}}
+/* 品质提升特效 */
+.merge-quality-up-flash{position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at center,rgba(245,158,11,.5),transparent 70%);pointer-events:none;z-index:299;animation:qualityUpFlash 1.5s ease-out forwards}
+@keyframes qualityUpFlash{0%{opacity:0}15%{opacity:1}40%{opacity:.6}100%{opacity:0}}
+/* 传说特效 */
+.merge-legendary-flash{position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at center,rgba(255,184,51,.6),transparent 60%),radial-gradient(ellipse at 30% 30%,rgba(255,200,100,.4),transparent 50%);pointer-events:none;z-index:299;animation:legendaryFlash 2s ease-out forwards}
+@keyframes legendaryFlash{0%{opacity:0;transform:scale(.8)}20%{opacity:1;transform:scale(1)}50%{opacity:.8}100%{opacity:0;transform:scale(1.2)}}
+.merge-legendary-text{position:fixed;top:20%;left:50%;transform:translateX(-50%);font-size:48px;font-weight:900;color:#ffb833;text-shadow:0 0 30px rgba(255,184,51,.8),0 0 60px rgba(255,184,51,.4);pointer-events:none;z-index:301;animation:legendaryText 2s ease-out forwards}
+@keyframes legendaryText{0%{opacity:0;transform:translateX(-50%) scale(.5) translateY(30px)}30%{opacity:1;transform:translateX(-50%) scale(1.1) translateY(0)}70%{opacity:1}100%{opacity:0;transform:translateX(-50%) scale(1) translateY(-20px)}}
+/* 神话特效 */
+.merge-mythic-flash{position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at center,rgba(239,68,68,.7),transparent 50%),radial-gradient(ellipse at 20% 80%,rgba(168,85,247,.5),transparent 40%),radial-gradient(ellipse at 80% 20%,rgba(245,158,11,.5),transparent 40%);pointer-events:none;z-index:299;animation:mythicFlash 3s ease-out forwards}
+@keyframes mythicFlash{0%{opacity:0;transform:scale(.5)}25%{opacity:1;transform:scale(1.1)}60%{opacity:.9}100%{opacity:0;transform:scale(1.3)}}
+.merge-mythic-text{position:fixed;top:15%;left:50%;transform:translateX(-50%);font-size:56px;font-weight:900;color:#ff5555;text-shadow:0 0 40px rgba(239,68,68,.9),0 0 80px rgba(239,68,68,.5),0 4px 12px rgba(0,0,0,.8);pointer-events:none;z-index:301;animation:mythicText 3s ease-out forwards}
+@keyframes mythicText{0%{opacity:0;transform:translateX(-50%) scale(.3) rotate(-10deg)}20%{opacity:1;transform:translateX(-50%) scale(1.2) rotate(0)}50%{opacity:1;transform:translateX(-50%) scale(1)}80%{opacity:.8}100%{opacity:0;transform:translateX(-50%) scale(1.1) translateY(-30px)}}
+.merge-mythic-particles{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:300;overflow:hidden}
+.merge-mythic-particles::before,.merge-mythic-particles::after{content:"✨";position:absolute;font-size:24px;animation:particleFloat 2s ease-out forwards}
+.merge-mythic-particles::before{left:20%;top:30%;animation-delay:.2s}
+.merge-mythic-particles::after{right:25%;top:40%;animation-delay:.5s}
+@keyframes particleFloat{0%{opacity:0;transform:translateY(20px) scale(0)}50%{opacity:1;transform:translateY(-20px) scale(1)}100%{opacity:0;transform:translateY(-60px) scale(.5)}}
+
 /* ===== 英雄卡片 ===== */
 .hero-card{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;cursor:pointer;transition:all .25s ease;display:flex;gap:10px;position:relative;overflow:hidden}
 .hero-card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;opacity:0;transition:opacity .25s}
@@ -3462,12 +3500,74 @@ function hashStr(str){
   return hash;
 }
 
+
+// ==================== 合成结果展示 ====================
+function showMergeResult(hero, isQualityUp, oldQuality){
+  var qualityColors={common:'#888',rare:'#4a9eff',epic:'#a855f7',legendary:'#f59e0b',mythic:'#ef4444'};
+  var qualityBg={common:'rgba(136,136,136,.15)',rare:'rgba(74,158,255,.15)',epic:'rgba(168,85,247,.15)',legendary:'rgba(245,158,11,.15)',mythic:'rgba(239,68,68,.15)'};
+  
+  // 创建特效层
+  var effects='';
+  if(hero.quality==='mythic'){
+    effects='<div class="merge-mythic-flash"></div><div class="merge-mythic-text">🔥 神话降临 🔥</div><div class="merge-mythic-particles"></div>';
+  }else if(hero.quality==='legendary'){
+    effects='<div class="merge-legendary-flash"></div><div class="merge-legendary-text">⚡ 传说诞生 ⚡</div>';
+  }else if(isQualityUp){
+    effects='<div class="merge-quality-up-flash"></div>';
+  }else if(hero.isMutation){
+    effects='<div class="merge-mutation-flash"></div>';
+  }
+  
+  // 创建结果卡片
+  var stats=getHeroStats(hero);
+  var skillsHtml=hero.skills.slice(0,4).map(function(s){return '<span class="merge-result-skill">'+s+'</span>'}).join('');
+  
+  var html=effects+'<div class="merge-result-overlay" onclick="closeMergeResult()">'+
+    '<div class="merge-result-card" onclick="event.stopPropagation()">'+
+      '<div class="merge-result-avatar" style="background:'+qualityBg[hero.quality]+';border-color:'+qualityColors[hero.quality]+'">'+hero.icon+'</div>'+
+      (hero.isMutation?'<div class="merge-result-mutation">☣️ 异变英雄 · 超越极限</div>':'')+
+      '<div class="merge-result-quality" style="color:'+qualityColors[hero.quality]+'">'+QUALITY_NAMES[hero.quality]+'</div>'+
+      '<div class="merge-result-name">'+hero.name+'</div>'+
+      '<div class="merge-result-stats">'+
+        '<div class="merge-result-stat">❤️ 生命<b>'+stats.maxHP+'</b></div>'+
+        '<div class="merge-result-stat">⚔️ 攻击<b>'+stats.atk+'</b></div>'+
+        '<div class="merge-result-stat">🛡️ 防御<b>'+stats.def+'</b></div>'+
+        '<div class="merge-result-stat">💨 速度<b>'+stats.spd+'</b></div>'+
+        '<div class="merge-result-stat">💎 魔法<b>'+stats.maxMP+'</b></div>'+
+        '<div class="merge-result-stat">⚡ 战力<b>'+calcHeroPower(hero)+'</b></div>'+
+      '</div>'+
+      '<div class="merge-result-skills">'+skillsHtml+'</div>'+
+      '<div style="display:flex;gap:8px;margin-top:16px">'+
+        '<button class="btn btn-primary" onclick="closeMergeResult();switchTab(\"heroes\")">查看英雄</button>'+
+        '<button class="btn" onclick="closeMergeResult()">继续合成</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+  
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+function closeMergeResult(){
+  var overlay=document.querySelector('.merge-result-overlay');
+  var flashes=document.querySelectorAll('.merge-mythic-flash,.merge-legendary-flash,.merge-quality-up-flash,.merge-mutation-flash,.merge-mythic-text,.merge-legendary-text,.merge-mythic-particles');
+  if(overlay)overlay.remove();
+  flashes.forEach(function(f){f.remove()});
+}
+
 function executeMerge(heroUids){
   const heroes=heroUids.map(uid=>G.heroes.find(h=>h.uid===uid)).filter(Boolean);
   if(heroes.length<2){showToast('请至少选择2个英雄！');return false}
   
+  // 记录最高品质用于判断品质提升
+  var qualities=heroes.map(function(h){return QUALITIES.indexOf(h.quality)});
+  var maxQIdx=Math.max.apply(null,qualities);
+  var oldQuality=QUALITIES[maxQIdx];
+  
   // 即时生成融合英雄
   const newHero=generateFusedHero(heroes);
+  
+  // 判断是否品质提升
+  var isQualityUp=QUALITIES.indexOf(newHero.quality)>maxQIdx;
   
   // 移除被融合的英雄
   heroes.forEach(h=>{
@@ -3481,6 +3581,9 @@ function executeMerge(heroUids){
   
   // 添加新英雄
   G.heroes.push(newHero);
+  
+  // 显示合成结果
+  showMergeResult(newHero,isQualityUp,oldQuality);
   
   showToast('融合成功！获得 '+QUALITY_NAMES[newHero.quality]+' 英雄：'+newHero.icon+' '+newHero.name);
   return true;
