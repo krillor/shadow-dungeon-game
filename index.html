@@ -3331,6 +3331,7 @@ function findMergeRecipe(heroUids){
 // 异变概率配置
 var G_MUTATION_RATE = 0.30;       // 30% 异变概率
 var G_QUALITY_UP_RATE = 0.05;      // 5% 品质+1概率
+var G_LEGENDARY_DIRECT_RATE = 0.03; // 3% 直接传说概率
 var G_MYTHIC_DIRECT_RATE = 0.01;   // 1% 直接神话概率
 
 function generateFusedHero(heroes){
@@ -3352,7 +3353,7 @@ function generateFusedHero(heroes){
     newQIdx=QUALITIES.indexOf(newQuality);
   }
   
-  // 2. 判定特殊结果（优先级：神话 > 品质+1 > 异变 > 普通）
+  // 2. 判定特殊结果（优先级：神话 > 传说 > 品质+1 > 异变 > 普通）
   // 金手指强制异变
   var isMutation=G_cheats.forceMutation||Math.random()<G_MUTATION_RATE;
   
@@ -3362,6 +3363,12 @@ function generateFusedHero(heroes){
     newQuality='mythic';
     newQIdx=QUALITIES.indexOf('mythic');
     isMutation=true; // 神话必定异变
+  }
+  // 3% 直接传说（无视当前品质，但低于神话优先级）
+  else if(Math.random()<G_LEGENDARY_DIRECT_RATE){
+    newQuality='legendary';
+    newQIdx=QUALITIES.indexOf('legendary');
+    isMutation=true; // 传说必定异变
   }
   // 5% 品质+1（不超过神话）
   else if(Math.random()<G_QUALITY_UP_RATE && newQIdx<QUALITIES.length-1){
