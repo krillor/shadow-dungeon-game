@@ -3964,6 +3964,7 @@ function renderCurrentTab(){
 }
 
 function renderTown(el){
+  try{
   var nextStage=getStage(G.stageProgress);
   var today=new Date().toDateString();
   // 检查离线收益
@@ -4045,6 +4046,15 @@ function renderTown(el){
     +'<div class="town-module-grid">'+modulesHtml+'</div>'
     +footerHtml
     +'';
+  }catch(err){
+    console.error('[Town Error]',err);
+    el.innerHTML='<div class="panel" style="color:#ff6b6b;padding:20px;text-align:center">'
+      +'<div style="font-size:24px;margin-bottom:12px">⚠️</div>'
+      +'<div style="font-weight:bold">主界面加载失败</div>'
+      +'<div style="font-size:11px;margin-top:8px;color:var(--text2)">'+err.message+'</div>'
+      +'<button class="btn btn-primary" style="margin-top:16px" onclick="location.reload()">刷新页面</button>'
+      +'</div>';
+  }
 }
 
 function renderTavernRecruit(){
