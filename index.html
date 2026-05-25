@@ -4018,10 +4018,6 @@ function renderTown(el){
     +'<button class="btn" onclick="renderTavernRecruit()">🍺 酒馆</button>'
     +'<button class="btn" onclick="switchTab(&quot;codex&quot;)">📖 图鉴</button>'
     +'<button class="btn" onclick="if(G_cheats.unlocked){switchTab(&quot;cheats&quot;)}else{showToast(&quot;金手指未解锁&quot;)}">🔧</button>'
-    +'</div>'
-    +'<div class="town-footer" style="margin-top:8px">'
-    +'<button class="btn" style="flex:0;white-space:nowrap" onclick="saveGame()">💾</button>'
-    +'<button class="btn" style="flex:0;white-space:nowrap" onclick="loadGame();updateResUI();renderCurrentTab();showToast(\'📂 已读档\');">📂</button>'
     +'</div>';
   
   el.innerHTML=bannersHtml+'<div class="town-header">'
@@ -5350,6 +5346,16 @@ function renderCheats(el){
           <div class="panel-title">⏭️ 关卡修改</div>
           <div class="btn-group">
             <button class="btn" onclick="cheatSkipStage()">跳过当前关卡</button>
+          </div>
+        </div>
+        <div class="panel" style="background:rgba(52,152,219,.1);border-color:rgba(52,152,219,.3)">
+          <div class="panel-title">💾 存档管理</div>
+          <div class="btn-group">
+            <button class="btn btn-primary" onclick="saveGame()">💾 保存游戏</button>
+            <button class="btn" onclick="loadGame();updateResUI();renderCurrentTab();showToast('📂 已读档')">📂 读取存档</button>
+          </div>
+          <div class="btn-group mt-8">
+            <button class="btn" style="color:#ff6b6b" onclick="if(confirm('确定删除所有存档？此操作不可恢复！')){deleteSave();showToast('🗑️ 已删除存档')}">🗑️ 删除存档</button>
           </div>
         </div>
       </div>
