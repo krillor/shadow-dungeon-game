@@ -3423,6 +3423,7 @@ function generateFusedHero(heroes){
   
   if(isQualityUp||isDirectLegendary||isDirectMythic){
     // 品质大幅提升：基于新品质标准计算，确保数值达标
+    console.log('[Merge] Quality up triggered:', {isQualityUp, isDirectLegendary, isDirectMythic, newQuality});
     var qm=QUALITY_MULT[newQuality];
     maxHP=calcStat(baseHP,qm,maxLevel);
     atk=calcStat(baseATK,qm,maxLevel);
