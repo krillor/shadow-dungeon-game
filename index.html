@@ -2133,6 +2133,74 @@ function addHeroExp(hero,amount){
   return leveled;
 }
 
+// ==================== 经验药水购买 ====================
+function buyExpPotion(size){
+  const potions={
+    small:{exp:50,cost:100,name:'小型经验药水'},
+    medium:{exp:200,cost:350,name:'中型经验药水'},
+    large:{exp:1000,cost:1500,name:'大型经验药水'}
+  };
+  const potion=potions[size];
+  if(!potion){showToast('未知的药水类型！');return}
+  
+  // 检查金币
+  if((G.resources.gold||0)<potion.cost){
+    showToast('金币不足！需要 💰'+potion.cost);
+    return;
+  }
+  
+  // 检查是否有英雄可以升级
+  if(G.heroes.length===0){
+    showToast('你没有英雄可以升级！');
+    return;
+  }
+  
+  // 扣除金币
+  G.resources.gold-=potion.cost;
+  
+  // 打开英雄选择界面
+  openExpPotionUseModal(potion);
+}
+
+function openExpPotionUseModal(potion){
+  const heroesHTML=G.heroes.map(h=>{
+    const expNeed=getExpToLevel(h.level);
+    const canLevelUp=h.exp+potion.exp>=expNeed && h.level<getHeroLevelCap();
+    return`<div class="hero-card quality-${h.quality}" style="cursor:pointer;${canLevelUp?'border:2px solid var(--green)':''}" onclick="useExpPotionOnHero(${h.uid},${potion.exp});closeModal()">`
+      +`<div class="hero-avatar">${h.icon}</div>`
+      +`<div class="hero-info">`
+      +`<div class="hero-name"><span class="q-${h.quality}">${h.name}</span> ${canLevelUp?'<span class="text-green">↑可升级</span>':''}</div>`
+      +`<div class="hero-meta">Lv.${h.level} · ${ROLES[h.role].name}</div>`
+      +`<div class="text-xs text-dim">EXP: ${h.exp}/${expNeed}</div>`
+      +`<div class="text-xs" style="color:var(--gold)">+${potion.exp} EXP</div>`
+      +`</div></div>`;
+  }).join('');
+  
+  openModal(`<div class="panel" style="max-width:500px">`
+    +`<div style="font-size:16px;font-weight:bold;margin-bottom:12px">🧪 使用${potion.name}</div>`
+    +`<div class="text-dim text-sm mb-8">点击英雄使用药水</div>`
+    +`<div style="display:flex;flex-wrap:wrap;gap:8px">${heroesHTML}</div>`
+    +`<div style="margin-top:16px;text-align:center"><button class="btn" onclick="closeModal()">取消</button></div>`
+    +`</div>`);
+}
+
+function useExpPotionOnHero(heroUid,expAmount){
+  const hero=G.heroes.find(h=>h.uid===heroUid);
+  if(!hero){showToast('英雄不存在！');return}
+  
+  const oldLevel=hero.level;
+  const leveled=addHeroExp(hero,expAmount);
+  
+  if(leveled){
+    showToast(`${hero.icon} ${hero.name} 升级了！Lv.${oldLevel} → Lv.${hero.level}`);
+  }else{
+    showToast(`${hero.icon} ${hero.name} 获得 ${expAmount} 经验`);
+  }
+  
+  saveGame();
+  updateResUI();
+}
+
 // ==================== 战斗引擎 ====================
 function createBattleUnit(hero,isEnemy=false){
   const stats=getHeroStats(hero);
@@ -3824,6 +3892,15 @@ function renderTown(el){
       <div class="text-dim text-sm mb-8">在酒馆招募新英雄（品质受酒馆等级影响）</div>
       <div class="btn-group">
         <button class="btn btn-primary" onclick="renderTavernRecruit()">🍺 前往酒馆</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="icon">🧪</span> 经验药水商店</div>
+      <div class="text-dim text-sm mb-8">使用金币购买经验药水，快速提升英雄等级</div>
+      <div class="btn-group">
+        <button class="btn" onclick="buyExpPotion('small')">🧪 小型药水 (+50exp) 💰100</button>
+        <button class="btn" onclick="buyExpPotion('medium')">🧪 中型药水 (+200exp) 💰350</button>
+        <button class="btn" onclick="buyExpPotion('large')">🧪 大型药水 (+1000exp) 💰1500</button>
       </div>
     </div>
     <div class="panel">
