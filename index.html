@@ -82,6 +82,19 @@ body{background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingF
 .merge-mythic-particles::after{right:25%;top:40%;animation-delay:.5s}
 @keyframes particleFloat{0%{opacity:0;transform:translateY(20px) scale(0)}50%{opacity:1;transform:translateY(-20px) scale(1)}100%{opacity:0;transform:translateY(-60px) scale(.5)}}
 
+
+/* ===== 城镇界面优化 ===== */
+.town-hero-summary{display:flex;gap:8px;margin-top:10px;padding:8px;background:rgba(0,0,0,.2);border-radius:6px;font-size:11px}
+.town-hero-summary-item{flex:1;text-align:center}
+.town-hero-summary-val{font-size:14px;font-weight:bold;color:var(--gold)}
+.town-hero-summary-lbl{color:var(--text2);margin-top:2px}
+.town-module-btn{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px;cursor:pointer;transition:all .2s;text-align:center}
+.town-module-btn:hover{transform:translateY(-1px);border-color:var(--gold);box-shadow:0 3px 10px rgba(0,0,0,.2)}
+.town-module-btn-icon{font-size:24px;margin-bottom:4px}
+.town-module-btn-name{font-size:12px;font-weight:bold;color:var(--gold)}
+.town-module-btn-info{font-size:10px;color:var(--text2);margin-top:2px}
+.town-quick-btns{display:flex;gap:6px;flex-wrap:wrap}
+
 /* ===== 英雄卡片 ===== */
 .hero-card{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;cursor:pointer;transition:all .25s ease;display:flex;gap:10px;position:relative;overflow:hidden}
 .hero-card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;opacity:0;transition:opacity .25s}
@@ -3926,94 +3939,123 @@ function renderCurrentTab(){
 }
 
 function renderTown(el){
-  var nextStage=getStage(G.stageProgress);
-  var today=new Date().toDateString();
-  // 检查离线收益
-  var offline=calculateOfflineEarnings();
-  if(offline) G.offlineEarnings=offline;
+  // 数据初始化和错误处理
+  try{
+    var nextStage=getStage(G.stageProgress);
+  }catch(e){
+    console.error('[Town Error] getStage:',e);
+    var nextStage={icon:'💀',name:'未知关卡'};
+  }
   
-  el.innerHTML=`
-    <!-- 离线收益横幅 -->
-    ${G.offlineEarnings?`
-    <div class="daily-bonus-banner" style="cursor:pointer;background:linear-gradient(135deg,rgba(100,200,255,.15),rgba(50,150,255,.05));border-color:rgba(100,200,255,.3)" onclick="claimOfflineEarnings()">
-      <span style="font-size:16px">💤</span> 离线收益可领取！离线 ${G.offlineEarnings.hours.toFixed(1)} 小时<br>
-      <span class="text-xs">💰${G.offlineEarnings.gold} 🍞${G.offlineEarnings.food} 🪨${G.offlineEarnings.stone} ⛏️${G.offlineEarnings.iron}</span>
-    </div>
-    `:''}
-    <!-- 每日奖励横幅 -->
-    ${!G.dailyBonusClaimed?`
-    <div class="daily-bonus-banner" style="cursor:pointer" onclick="claimDailyBonus()">
-      <span style="font-size:16px">🎁</span> 点击领取每日登录奖励！<br>
-      <span class="text-xs text-dim">随进度提升：约${200+G.stageProgress*30}💰 ${100+G.stageProgress*10}🍞 ${30+G.stageProgress*5}🪨 ${15+G.stageProgress*3}⛏️</span>
-    </div>
-    `:''}
-    <div class="panel">
-      <div class="panel-title"><span class="icon">🏰</span> 暗影地牢</div>
-      <div style="color:var(--text2);font-size:12px;line-height:1.8">
-        <p>黑暗笼罩了这片大陆。曾经繁荣的帝国已经覆灭，亡灵和恶魔在废墟中游荡。</p>
-        <p>你是最后的希望——一位流浪的指挥官，必须召集英雄，探索地牢，击败黑暗势力。</p>
-        <p style="margin-top:8px;color:var(--gold)">当前进度：第 ${G.stageProgress-1} 章已通关（无限模式）</p>
-        <p style="color:var(--text2)">下一关：${nextStage.icon+' '+nextStage.name}</p>
-        ${G.pveWinStreak>=3?`<p style="color:#ff6b00">🔥 当前PVE连胜: ${G.pveWinStreak} 连 | 最高: ${G.pveMaxStreak} 连</p>`:''}
-        ${G.pveMaxStreak>=5?`<p style="color:var(--gold)">🏆 历史最佳: ${G.pveMaxStreak} 连胜！</p>`:''}
-      </div>
-    </div>
-    <div class="grid-2">
-      <div class="panel" style="cursor:pointer" onclick="switchTab('heroes')">
-        <div class="panel-title"><span class="icon">⚔️</span> 英雄管理</div>
-        <div class="text-dim text-sm">管理你的英雄，查看属性和技能</div>
-        <div style="margin-top:8px;color:var(--gold)">共 ${G.heroes.length} 位英雄</div>
-      </div>
-      <div class="panel" style="cursor:pointer" onclick="switchTab('team')">
-        <div class="panel-title"><span class="icon">🛡️</span> 队伍编成</div>
-        <div class="text-dim text-sm">编组你的战斗队伍（最多6人）</div>
-        <div style="margin-top:8px;color:var(--gold)">已编入 ${G.team.filter(t=>t!==null).length}/6</div>
-      </div>
-      <div class="panel" style="cursor:pointer" onclick="switchTab('battle')">
-        <div class="panel-title"><span class="icon">💀</span> 出征战斗</div>
-        <div class="text-dim text-sm">选择关卡，自动战斗</div>
-        <div style="margin-top:8px;color:var(--gold)">下一关：${nextStage?nextStage.name:'已全部通关'}</div>
-      </div>
-      <div class="panel" style="cursor:pointer" onclick="switchTab('merge')">
-        <div class="panel-title"><span class="icon">⚗️</span> 英雄合成</div>
-        <div class="text-dim text-sm">融合英雄，创造更强力的存在</div>
-        <div style="margin-top:8px;color:var(--gold)">已发现 ${MERGE_RECIPES.length} 种配方</div>
-      </div>
-      <div class="panel" style="cursor:pointer" onclick="switchTab('equip')">
-        <div class="panel-title"><span class="icon">🗡️</span> 装备管理</div>
-        <div class="text-dim text-sm">为英雄配备强力装备</div>
-        <div style="margin-top:8px;color:var(--gold)">背包 ${G.equipment.filter(e=>e.heroUid===null).length} 件装备</div>
-      </div>
-      <div class="panel" style="cursor:pointer" onclick="switchTab('buildings')">
-        <div class="panel-title"><span class="icon">🏗️</span> 城镇建筑</div>
-        <div class="text-dim text-sm">升级建筑，解锁更多功能</div>
-        <div style="margin-top:8px;color:var(--gold)">酒馆 Lv.${G.buildings.tavern} | 铁匠铺 Lv.${G.buildings.blacksmith}</div>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="panel-title"><span class="icon">⚔️</span> 自动推图</div>
-      <div class="text-dim text-sm mb-8">从当前关卡开始，自动战斗直到失败</div>
-      <div class="btn-group">
-        <button class="btn btn-primary" onclick="startAutoBattle(G.stageProgress)">▶️ 开始自动推图</button>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="panel-title"><span class="icon">📜</span> 快速招募</div>
-      <div class="text-dim text-sm mb-8">在酒馆招募新英雄（品质受酒馆等级影响）</div>
-      <div class="btn-group">
-        <button class="btn btn-primary" onclick="renderTavernRecruit()">🍺 前往酒馆</button>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="panel-title"><span class="icon">💾</span> 存档管理</div>
-      <div class="text-dim text-sm mb-8">保存或读取游戏进度</div>
-      <div class="btn-group">
-        <button class="btn btn-primary" onclick="saveGame()">💾 保存游戏</button>
-        <button class="btn" onclick="loadGame();updateResUI();renderCurrentTab();showToast('📂 已读档');">📂 读取存档</button>
-        <button class="btn" style="color:#ff6b6b" onclick="deleteSave()">🗑️ 删除存档</button>
-      </div>
-    </div>
-  `;
+  // 确保基础数据结构存在
+  G.team=G.team||[];
+  G.equipment=G.equipment||[];
+  G.buildings=G.buildings||{};
+  G.heroes=G.heroes||[];
+  
+  // 计算统计（带防护）
+  var heroCount=G.heroes.length;
+  var teamCount=0;
+  var teamPower=0;
+  try{
+    teamCount=G.team.filter(function(t){return t!==null}).length;
+    teamPower=G.team.filter(function(t){return t}).reduce(function(s,t){return s+(calcHeroPower?calcHeroPower(t):0)},0);
+  }catch(e){console.error('[Town Error] stats:',e);}
+  
+  var equipCount=0;
+  try{
+    equipCount=G.equipment.filter(function(e){return e&&e.heroUid===null}).length;
+  }catch(e){console.error('[Town Error] equipCount:',e);}
+  
+  // 检查离线收益
+  try{
+    var offline=calculateOfflineEarnings();
+    if(offline) G.offlineEarnings=offline;
+  }catch(e){console.error('[Town Error] offline:',e);}
+  
+  // 构建HTML
+  try{
+    el.innerHTML='<div class="panel">'
+      +'<div class="panel-title"><span class="icon">🏰</span> 暗影地牢</div>'
+      +'<div style="color:var(--text2);font-size:12px;line-height:1.8">'
+        +'<p>黑暗笼罩了这片大陆。曾经繁荣的帝国已经覆灭，亡灵和恶魔在废墟中游荡。</p>'
+        +'<p>你是最后的希望——一位流浪的指挥官，必须召集英雄，探索地牢，击败黑暗势力。</p>'
+        +'<p style="margin-top:8px;color:var(--gold)">当前进度：第 '+(G.stageProgress-1)+' 章已通关（无限模式）</p>'
+        +'<p style="color:var(--text2)">下一关：'+(nextStage?nextStage.icon+' '+nextStage.name:'已全部通关')+'</p>'
+        +(G.pveWinStreak>=3?'<p style="color:#ff6b00">🔥 当前PVE连胜: '+G.pveWinStreak+' 连 | 最高: '+G.pveMaxStreak+' 连</p>':'')
+        +(G.pveMaxStreak>=5?'<p style="color:var(--gold)">🏆 历史最佳: '+G.pveMaxStreak+' 连胜！</p>':'')
+      +'</div>'
+      +'<div class="town-hero-summary">'
+        +'<div class="town-hero-summary-item"><div class="town-hero-summary-val">'+heroCount+'</div><div class="town-hero-summary-lbl">英雄</div></div>'
+        +'<div class="town-hero-summary-item"><div class="town-hero-summary-val">'+teamCount+'/6</div><div class="town-hero-summary-lbl">队伍</div></div>'
+        +'<div class="town-hero-summary-item"><div class="town-hero-summary-val">'+teamPower+'</div><div class="town-hero-summary-lbl">战力</div></div>'
+        +'<div class="town-hero-summary-item"><div class="town-hero-summary-val">'+(G.stageProgress-1)+'</div><div class="town-hero-summary-lbl">关卡</div></div>'
+      +'</div>'
+    +'</div>'
+    +'<div class="panel">'
+      +'<div class="panel-title"><span class="icon">⚔️</span> 快速入口</div>'
+      +'<div class="town-quick-btns">'
+        +'<button class="btn btn-primary" style="flex:1" onclick="startAutoBattle(G.stageProgress)">▶️ 自动推图</button>'
+        +'<button class="btn" style="flex:1" onclick="renderTavernRecruit()">🍺 招募</button>'
+      +'</div>'
+    +'</div>'
+    +'<div class="grid-2">'
+      +'<div class="town-module-btn" onclick="switchTab(\'heroes\')">'
+        +'<div class="town-module-btn-icon">⚔️</div>'
+        +'<div class="town-module-btn-name">英雄管理</div>'
+        +'<div class="town-module-btn-info">'+heroCount+' 位英雄</div>'
+      +'</div>'
+      +'<div class="town-module-btn" onclick="switchTab(\'team\')">'
+        +'<div class="town-module-btn-icon">🛡️</div>'
+        +'<div class="town-module-btn-name">队伍编成</div>'
+        +'<div class="town-module-btn-info">'+teamCount+'/6 已编入</div>'
+      +'</div>'
+      +'<div class="town-module-btn" onclick="switchTab(\'battle\')">'
+        +'<div class="town-module-btn-icon">💀</div>'
+        +'<div class="town-module-btn-name">出征战斗</div>'
+        +'<div class="town-module-btn-info">'+(nextStage?nextStage.name:'已全部通关')+'</div>'
+      +'</div>'
+      +'<div class="town-module-btn" onclick="switchTab(\'merge\')">'
+        +'<div class="town-module-btn-icon">⚗️</div>'
+        +'<div class="town-module-btn-name">英雄合成</div>'
+        +'<div class="town-module-btn-info">'+MERGE_RECIPES.length+' 种配方</div>'
+      +'</div>'
+      +'<div class="town-module-btn" onclick="switchTab(\'equip\')">'
+        +'<div class="town-module-btn-icon">🗡️</div>'
+        +'<div class="town-module-btn-name">装备管理</div>'
+        +'<div class="town-module-btn-info">'+equipCount+' 件待装备</div>'
+      +'</div>'
+      +'<div class="town-module-btn" onclick="switchTab(\'buildings\')">'
+        +'<div class="town-module-btn-icon">🏗️</div>'
+        +'<div class="town-module-btn-name">城镇建筑</div>'
+        +'<div class="town-module-btn-info">酒馆 Lv.'+G.buildings.tavern+'</div>'
+      +'</div>'
+    +'</div>'
+    +(G.offlineEarnings?'<div class="daily-bonus-banner" style="cursor:pointer;background:linear-gradient(135deg,rgba(100,200,255,.15),rgba(50,150,255,.05));border-color:rgba(100,200,255,.3)" onclick="claimOfflineEarnings()">'
+      +'<span style="font-size:16px">💤</span> 离线收益可领取！离线 '+G.offlineEarnings.hours.toFixed(1)+' 小时<br>'
+      +'<span class="text-xs">💰'+G.offlineEarnings.gold+' 🍞'+G.offlineEarnings.food+' 🪨'+G.offlineEarnings.stone+' ⛏️'+G.offlineEarnings.iron+'</span>'
+    +'</div>':'')
+    +(!G.dailyBonusClaimed?'<div class="daily-bonus-banner" style="cursor:pointer" onclick="claimDailyBonus()">'
+      +'<span style="font-size:16px">🎁</span> 点击领取每日登录奖励！<br>'
+      +'<span class="text-xs text-dim">随进度提升：约'+(200+G.stageProgress*30)+'💰 '+(100+G.stageProgress*10)+'🍞 '+(30+G.stageProgress*5)+'🪨 '+(15+G.stageProgress*3)+'⛏️</span>'
+    +'</div>':'')
+    +'<div class="panel">'
+      +'<div class="panel-title"><span class="icon">💾</span> 存档管理</div>'
+      +'<div class="btn-group">'
+        +'<button class="btn btn-primary" onclick="saveGame()">💾 保存</button>'
+        +'<button class="btn" onclick="loadGame();updateResUI();renderCurrentTab();showToast(\'📂 已读档\')">📂 读取</button>'
+        +'<button class="btn" style="color:#ff6b6b" onclick="if(confirm(\'确定删除存档？\'))deleteSave()">🗑️ 删除</button>'
+      +'</div>'
+    +'</div>';
+  }catch(htmlErr){
+    // HTML生成失败时显示原始错误
+    console.error('[Town Error] HTML generation:',htmlErr);
+    el.innerHTML='<div class="panel" style="border-color:#ff6b6b;background:rgba(255,107,107,.1)">'
+      +'<div style="color:#ff6b6b;font-weight:bold;margin-bottom:8px">❌ 主界面加载失败</div>'
+      +'<div style="color:var(--text2);font-size:11px">'+htmlErr.message+'</div>'
+      +'<button class="btn" style="margin-top:12px" onclick="location.reload()">🔄 刷新页面</button>'
+    +'</div>';
+  }
 }
 
 function renderTavernRecruit(){
