@@ -3338,13 +3338,19 @@ function generateFusedHero(heroes){
   var inputIds=heroes.map(function(h){return h.id}).sort().join('+');
   var hash=hashStr(inputIds);
   
-  // 1. 确定新品质：不能超过被融合最高品质
+  // 1. 确定新品质：金手指强制 > 正常计算
   var qualities=heroes.map(function(h){return QUALITIES.indexOf(h.quality)});
   var maxQ=Math.max.apply(null,qualities);
   var avgQ=Math.floor(qualities.reduce(function(s,v){return s+v},0)/qualities.length);
   // 新品质 = 平均品质，但不能超过最高品质
   var newQIdx=Math.min(maxQ,avgQ);
   var newQuality=QUALITIES[newQIdx];
+  
+  // 金手指强制品质（最高优先级）
+  if(G_cheats.enabled && G_cheats.forceQuality){
+    newQuality=G_cheats.forceQuality;
+    newQIdx=QUALITIES.indexOf(newQuality);
+  }
   
   // 2. 判定特殊结果（优先级：神话 > 品质+1 > 异变 > 普通）
   // 金手指强制异变
@@ -4973,7 +4979,13 @@ var G_cheats = {
   infiniteMP: false,
   oneHitKill: false,
   forceMutation: false,
-  showMergeResult: false  // 默认隐藏合成结果
+  showMergeResult: false,  // 默认隐藏合成结果
+  // 英雄相关金手指
+  forceQuality: null,      // 强制指定品质
+  forceLegendary: false,   // 强制传说
+  forceMythic: false,      // 强制神话
+  infiniteRecruit: false,  // 无限招募
+  freeEnhance: false       // 免费强化
 };
 
 // ==================== 图鉴系统 ====================
@@ -5063,6 +5075,120 @@ function renderCodex(el){
   `;
 }
 
+
+// ==================== 英雄金手指功能 ====================
+
+// 指定品质生成英雄
+function cheatSpawnHero(quality){
+  if(!G_cheats.enabled){showToast('请先开启金手指');return;}
+  var tpl = HERO_TEMPLATES.filter(function(t){return t.quality===(quality||'rare')})[0] || HERO_TEMPLATES[0];
+  var hero = createHero(tpl.id);
+  hero.quality = quality || 'rare';
+  // 重新计算属性
+  var qm = QUALITY_MULT[hero.quality];
+  hero.maxHP = Math.floor(hero.maxHP * qm / QUALITY_MULT.common);
+  hero.hp = hero.maxHP;
+  hero.atk = Math.floor(hero.atk * qm / QUALITY_MULT.common);
+  hero.def = Math.floor(hero.def * qm / QUALITY_MULT.common);
+  hero.spd = Math.floor(hero.spd * qm / QUALITY_MULT.common);
+  hero.maxMP = Math.floor(hero.maxMP * qm / QUALITY_MULT.common);
+  hero.mp = hero.maxMP;
+  G.heroes.push(hero);
+  saveGame();
+  showToast('✨ 已生成 ' + QUALITY_NAMES[hero.quality] + ' 英雄: ' + hero.icon + ' ' + hero.name);
+  renderCurrentTab();
+}
+
+// 修改指定英雄等级
+function cheatSetHeroLevel(uid, level){
+  if(!G_cheats.enabled){showToast('请先开启金手指');return;}
+  var hero = G.heroes.find(function(h){return h.uid===uid});
+  if(!hero){showToast('英雄不存在');return;}
+  hero.level = Math.max(1, Math.min(99, level));
+  saveGame();
+  showToast(hero.icon + ' ' + hero.name + ' 等级已设为 ' + hero.level);
+  renderCurrentTab();
+}
+
+// 一键满级所有英雄
+function cheatMaxAllHeroes(){
+  if(!G_cheats.enabled){showToast('请先开启金手指');return;}
+  G.heroes.forEach(function(h){h.level=99});
+  saveGame();
+  showToast('✨ 所有英雄已升至99级');
+  renderCurrentTab();
+}
+
+// 一键满技能所有英雄
+function cheatMaxAllSkills(){
+  if(!G_cheats.enabled){showToast('请先开启金手指');return;}
+  G.heroes.forEach(function(h){
+    // 添加所有该职业的技能
+    var roleSkills = ROLES[h.role].skills || [];
+    roleSkills.forEach(function(s){
+      if(h.skills.indexOf(s)===-1) h.skills.push(s);
+    });
+    // 添加一些通用技能
+    var bonus = ['连击','反击','吸血','暴击强化','闪避','坚韧'];
+    bonus.forEach(function(s){
+      if(h.bonusSkills.indexOf(s)===-1 && h.skills.indexOf(s)===-1) h.bonusSkills.push(s);
+    });
+  });
+  saveGame();
+  showToast('✨ 所有英雄已学会全部技能');
+  renderCurrentTab();
+}
+
+// 强制指定合成结果品质
+function cheatForceQuality(quality){
+  if(!G_cheats.enabled){showToast('请先开启金手指');return;}
+  G_cheats.forceQuality = quality;
+  G_cheats.forceLegendary = (quality==='legendary');
+  G_cheats.forceMythic = (quality==='mythic');
+  showToast(quality ? '⚗️ 已强制合成结果为: ' + QUALITY_NAMES[quality] : '⚗️ 已取消强制品质');
+}
+
+// 切换无限招募
+function cheatInfiniteRecruit(){
+  if(!G_cheats.enabled){showToast('请先开启金手指');return;}
+  G_cheats.infiniteRecruit = !G_cheats.infiniteRecruit;
+  showToast(G_cheats.infiniteRecruit ? '🍺 无限招募已开启' : '🍺 无限招募已关闭');
+}
+
+// 切换免费强化
+function cheatFreeEnhance(){
+  if(!G_cheats.enabled){showToast('请先开启金手指');return;}
+  G_cheats.freeEnhance = !G_cheats.freeEnhance;
+  showToast(G_cheats.freeEnhance ? '🔨 免费强化已开启' : '🔨 免费强化已关闭');
+}
+
+// 删除指定英雄
+function cheatDeleteHero(uid){
+  if(!G_cheats.enabled){showToast('请先开启金手指');return;}
+  var idx = G.heroes.findIndex(function(h){return h.uid===uid});
+  if(idx<0){showToast('英雄不存在');return;}
+  var h = G.heroes[idx];
+  G.team = G.team.map(function(t){return (t&&t.uid===uid)?null:t});
+  G.heroes.splice(idx,1);
+  saveGame();
+  showToast('🗑️ 已删除 ' + h.icon + ' ' + h.name);
+  renderCurrentTab();
+}
+
+// 复制英雄
+function cheatCloneHero(uid){
+  if(!G_cheats.enabled){showToast('请先开启金手指');return;}
+  var hero = G.heroes.find(function(h){return h.uid===uid});
+  if(!hero){showToast('英雄不存在');return;}
+  var clone = JSON.parse(JSON.stringify(hero));
+  clone.uid = ++G.heroIdCounter;
+  clone.name = hero.name + '·复制';
+  G.heroes.push(clone);
+  saveGame();
+  showToast('📋 已复制 ' + hero.icon + ' ' + hero.name);
+  renderCurrentTab();
+}
+
 function renderCheats(el){
   if(!G_cheats.unlocked){
     el.innerHTML=`
@@ -5102,10 +5228,18 @@ function renderCheats(el){
           </div>
         </div>
         <div class="panel" style="background:rgba(142,68,173,.1);border-color:rgba(142,68,173,.3)">
-          <div class="panel-title">⭐ 角色修改</div>
+          <div class="panel-title">⭐ 英雄修改</div>
           <div class="btn-group">
             <button class="btn" onclick="cheatMaxLevel()">所有英雄50级</button>
+            <button class="btn" onclick="cheatMaxAllHeroes()">所有英雄99级</button>
+            <button class="btn" onclick="cheatMaxAllSkills()">所有英雄满技能</button>
             <button class="btn" onclick="cheatUnlockAll()">解锁所有英雄</button>
+          </div>
+          <div class="btn-group mt-8">
+            <button class="btn" onclick="cheatSpawnHero('rare')">生成精良英雄</button>
+            <button class="btn" onclick="cheatSpawnHero('epic')">生成史诗英雄</button>
+            <button class="btn" onclick="cheatSpawnHero('legendary')">生成传说英雄</button>
+            <button class="btn" onclick="cheatSpawnHero('mythic')">生成神话英雄</button>
           </div>
         </div>
         <div class="panel" style="background:rgba(41,128,185,.1);border-color:rgba(41,128,185,.3)">
@@ -5121,6 +5255,17 @@ function renderCheats(el){
           <div class="btn-group">
             <button class="btn ${G_cheats.forceMutation?'btn-primary':''}" onclick="cheatForceMutation()">${G_cheats.forceMutation?'☣️ 强制异变[开]':'☣️ 强制异变[关]'}</button>
             <button class="btn ${G_cheats.showMergeResult?'btn-primary':''}" onclick="cheatShowMergeResult()">${G_cheats.showMergeResult?'🔮 显示合成结果[开]':'🔮 显示合成结果[关]'}</button>
+          </div>
+          <div class="btn-group mt-8">
+            <button class="btn ${G_cheats.forceQuality==='legendary'?'btn-primary':''}" onclick="cheatForceQuality(${G_cheats.forceQuality==='legendary'?'null':"'legendary'"})">${G_cheats.forceQuality==='legendary'?'⚡ 强制传说[开]':'⚡ 强制传说[关]'}</button>
+            <button class="btn ${G_cheats.forceQuality==='mythic'?'btn-primary':''}" onclick="cheatForceQuality(${G_cheats.forceQuality==='mythic'?'null':"'mythic'"})">${G_cheats.forceQuality==='mythic'?'🔥 强制神话[开]':'🔥 强制神话[关]'}</button>
+          </div>
+        </div>
+        <div class="panel" style="background:rgba(230,126,34,.1);border-color:rgba(230,126,34,.3)">
+          <div class="panel-title">🍺 酒馆/装备</div>
+          <div class="btn-group">
+            <button class="btn ${G_cheats.infiniteRecruit?'btn-primary':''}" onclick="cheatInfiniteRecruit()">${G_cheats.infiniteRecruit?'🍺 无限招募[开]':'🍺 无限招募[关]'}</button>
+            <button class="btn ${G_cheats.freeEnhance?'btn-primary':''}" onclick="cheatFreeEnhance()">${G_cheats.freeEnhance?'🔨 免费强化[开]':'🔨 免费强化[关]'}</button>
           </div>
         </div>
         <div class="panel" style="background:rgba(39,174,96,.1);border-color:rgba(39,174,96,.3)">
