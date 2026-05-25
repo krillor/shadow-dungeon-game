@@ -3423,27 +3423,31 @@ function generateFusedHero(heroes){
   
   if(isQualityUp||isDirectLegendary||isDirectMythic){
     // 品质大幅提升：基于新品质标准计算，确保数值达标
-    console.log('[Merge] Quality up triggered:', {isQualityUp, isDirectLegendary, isDirectMythic, newQuality});
     var qm=QUALITY_MULT[newQuality];
-    maxHP=calcStat(baseHP,qm,maxLevel);
-    atk=calcStat(baseATK,qm,maxLevel);
-    def=calcStat(baseDEF,qm,maxLevel);
-    spd=calcStat(baseSPD,qm,maxLevel);
-    maxMP=calcStat(baseMP,qm,maxLevel);
+    var stdHP=calcStat(baseHP,qm,maxLevel);
+    var stdATK=calcStat(baseATK,qm,maxLevel);
+    var stdDEF=calcStat(baseDEF,qm,maxLevel);
+    var stdSPD=calcStat(baseSPD,qm,maxLevel);
+    var stdMP=calcStat(baseMP,qm,maxLevel);
     
-    // 额外加成：取材料中该属性的最高值作为参考，确保不弱于材料
+    // 额外加成：取材料中该属性的最高值作为参考
     var maxMaterialHP=Math.max.apply(null,heroes.map(function(h){return h.maxHP}));
     var maxMaterialATK=Math.max.apply(null,heroes.map(function(h){return h.atk}));
     var maxMaterialDEF=Math.max.apply(null,heroes.map(function(h){return h.def}));
     var maxMaterialSPD=Math.max.apply(null,heroes.map(function(h){return h.spd}));
     var maxMaterialMP=Math.max.apply(null,heroes.map(function(h){return h.maxMP}));
     
-    // 最终属性 = max(新标准, 材料最高值 * 1.1) 确保有提升
-    maxHP=Math.max(maxHP,Math.floor(maxMaterialHP*1.1));
-    atk=Math.max(atk,Math.floor(maxMaterialATK*1.1));
-    def=Math.max(def,Math.floor(maxMaterialDEF*1.1));
-    spd=Math.max(spd,Math.floor(maxMaterialSPD*1.1));
-    maxMP=Math.max(maxMP,Math.floor(maxMaterialMP*1.1));
+    // 最终属性 = max(新标准, 材料最高值 * 品质倍率差)
+    // 确保新品质英雄明显强于材料（使用材料最高品质计算倍率差）
+    var matMaxQm=QUALITY_MULT[QUALITIES[maxQ]];
+    var multDiff=qm/matMaxQm;
+    multDiff=Math.max(multDiff,1.3); // 至少30%提升
+    maxHP=Math.max(stdHP,Math.floor(maxMaterialHP*multDiff));
+    atk=Math.max(stdATK,Math.floor(maxMaterialATK*multDiff));
+    def=Math.max(stdDEF,Math.floor(maxMaterialDEF*multDiff));
+    spd=Math.max(stdSPD,Math.floor(maxMaterialSPD*multDiff));
+    maxMP=Math.max(stdMP,Math.floor(maxMaterialMP*multDiff));
+    console.log('[Merge] Quality up:',newQuality,'qm='+qm,'level='+maxLevel,'stdHP='+stdHP,'maxMatHP='+maxMaterialHP,'finalHP='+maxHP);
   }else if(isMutation){
     // 普通异变（同品质）：取材料最高属性 * 异变加成
     var qm=QUALITY_MULT[newQuality];
