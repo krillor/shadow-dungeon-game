@@ -3405,7 +3405,7 @@ function generateFusedHero(heroes){
   var shuffled=allSkillPool.slice().sort(function(){return Math.random()-0.5});
   var newSkills=shuffled.slice(0,skillCount);
   
-  // 5. 确定新属性
+  // 5. 确定新属性 - 统一逻辑：max(职业品质标准, 材料最高属性)
   var roleData=ROLES[mainRole];
   var baseHP=roleData?roleData.baseHP:100;
   var baseATK=roleData?roleData.baseATK:15;
@@ -3413,60 +3413,41 @@ function generateFusedHero(heroes){
   var baseSPD=roleData?roleData.baseSPD:10;
   var baseMP=roleData?roleData.baseMP:40;
   
-  // 计算材料英雄的平均等级
-  var avgLevel=Math.floor(heroes.reduce(function(s,h){return s+h.level},0)/heroes.length);
+  // 取材料最高等级
   var maxLevel=Math.max.apply(null,heroes.map(function(h){return h.level}));
   
-  // 品质提升或异变时：基于新品质标准重新计算属性
-  // 普通合成：继承材料属性（取平均值）
-  var maxHP,atk,def,spd,maxMP;
+  // 基于新职业和新品质计算标准值
+  var qm=QUALITY_MULT[newQuality];
+  var stdHP=calcStat(baseHP,qm,maxLevel);
+  var stdATK=calcStat(baseATK,qm,maxLevel);
+  var stdDEF=calcStat(baseDEF,qm,maxLevel);
+  var stdSPD=calcStat(baseSPD,qm,maxLevel);
+  var stdMP=calcStat(baseMP,qm,maxLevel);
   
-  if(isQualityUp||isDirectLegendary||isDirectMythic){
-    // 品质大幅提升：基于新品质标准计算，确保数值达标
-    var qm=QUALITY_MULT[newQuality];
-    var stdHP=calcStat(baseHP,qm,maxLevel);
-    var stdATK=calcStat(baseATK,qm,maxLevel);
-    var stdDEF=calcStat(baseDEF,qm,maxLevel);
-    var stdSPD=calcStat(baseSPD,qm,maxLevel);
-    var stdMP=calcStat(baseMP,qm,maxLevel);
-    
-    // 额外加成：取材料中该属性的最高值作为参考
-    var maxMaterialHP=Math.max.apply(null,heroes.map(function(h){return h.maxHP}));
-    var maxMaterialATK=Math.max.apply(null,heroes.map(function(h){return h.atk}));
-    var maxMaterialDEF=Math.max.apply(null,heroes.map(function(h){return h.def}));
-    var maxMaterialSPD=Math.max.apply(null,heroes.map(function(h){return h.spd}));
-    var maxMaterialMP=Math.max.apply(null,heroes.map(function(h){return h.maxMP}));
-    
-    // 最终属性 = max(新标准, 材料最高值 * 品质倍率差)
-    // 确保新品质英雄明显强于材料（使用材料最高品质计算倍率差）
-    var matMaxQm=QUALITY_MULT[QUALITIES[maxQ]];
-    var multDiff=qm/matMaxQm;
-    multDiff=Math.max(multDiff,1.3); // 至少30%提升
-    maxHP=Math.max(stdHP,Math.floor(maxMaterialHP*multDiff));
-    atk=Math.max(stdATK,Math.floor(maxMaterialATK*multDiff));
-    def=Math.max(stdDEF,Math.floor(maxMaterialDEF*multDiff));
-    spd=Math.max(stdSPD,Math.floor(maxMaterialSPD*multDiff));
-    maxMP=Math.max(stdMP,Math.floor(maxMaterialMP*multDiff));
-    console.log('[Merge] Quality up:',newQuality,'qm='+qm,'level='+maxLevel,'stdHP='+stdHP,'maxMatHP='+maxMaterialHP,'finalHP='+maxHP);
-  }else if(isMutation){
-    // 普通异变（同品质）：取材料最高属性 * 异变加成
-    var qm=QUALITY_MULT[newQuality];
-    var nextQm=QUALITIES.indexOf(newQuality)<QUALITIES.length-1?QUALITY_MULT[QUALITIES[QUALITIES.indexOf(newQuality)+1]]:qm;
-    var mutMult=1.0+(nextQm/qm-1.0)*0.5;
-    
-    maxHP=Math.floor(Math.max.apply(null,heroes.map(function(h){return h.maxHP}))*mutMult);
-    atk=Math.floor(Math.max.apply(null,heroes.map(function(h){return h.atk}))*mutMult);
-    def=Math.floor(Math.max.apply(null,heroes.map(function(h){return h.def}))*mutMult);
-    spd=Math.floor(Math.max.apply(null,heroes.map(function(h){return h.spd}))*mutMult);
-    maxMP=Math.floor(Math.max.apply(null,heroes.map(function(h){return h.maxMP}))*mutMult);
-  }else{
-    // 普通合成：继承材料属性（取平均值）
-    maxHP=Math.floor(heroes.reduce(function(s,h){return s+h.maxHP},0)/heroes.length);
-    atk=Math.floor(heroes.reduce(function(s,h){return s+h.atk},0)/heroes.length);
-    def=Math.floor(heroes.reduce(function(s,h){return s+h.def},0)/heroes.length);
-    spd=Math.floor(heroes.reduce(function(s,h){return s+h.spd},0)/heroes.length);
-    maxMP=Math.floor(heroes.reduce(function(s,h){return s+h.maxMP},0)/heroes.length);
+  // 取材料中各属性的最高值
+  var maxMaterialHP=Math.max.apply(null,heroes.map(function(h){return h.maxHP}));
+  var maxMaterialATK=Math.max.apply(null,heroes.map(function(h){return h.atk}));
+  var maxMaterialDEF=Math.max.apply(null,heroes.map(function(h){return h.def}));
+  var maxMaterialSPD=Math.max.apply(null,heroes.map(function(h){return h.spd}));
+  var maxMaterialMP=Math.max.apply(null,heroes.map(function(h){return h.maxMP}));
+  
+  // 最终属性 = max(职业品质标准, 材料最高属性)
+  // 确保合成英雄既符合职业品质标准，又不弱于材料
+  var maxHP=Math.max(stdHP,maxMaterialHP);
+  var atk=Math.max(stdATK,maxMaterialATK);
+  var def=Math.max(stdDEF,maxMaterialDEF);
+  var spd=Math.max(stdSPD,maxMaterialSPD);
+  var maxMP=Math.max(stdMP,maxMaterialMP);
+  
+  // 异变/品质提升时额外加成10%
+  if(isMutation||isQualityUp||isDirectLegendary||isDirectMythic){
+    maxHP=Math.floor(maxHP*1.1);
+    atk=Math.floor(atk*1.1);
+    def=Math.floor(def*1.1);
+    spd=Math.floor(spd*1.1);
+    maxMP=Math.floor(maxMP*1.1);
   }
+  console.log('[Merge]',newQuality,mainRole,'stdHP='+stdHP,'matHP='+maxMaterialHP,'final='+maxHP);
   
   // 6. 生成名称和图标
   var namePrefixes={
