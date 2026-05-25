@@ -108,13 +108,13 @@ body{background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingF
 .battle-unit.hit{animation:hitShake .3s ease}
 .battle-unit.heal-target{animation:healGlow .5s ease}
 .battle-unit.shield-up{animation:shieldFlash .4s ease}
-@keyframes hitShake{0%{transform:translateX(0)}15%{transform:translateX(-4px)}30%{transform:translateX(3px)}45%{transform:translateX(-2px)}60%{transform:translateX(2px)}75%{transform:translateX(-1px)}100%{transform:translateX(0)}}
+@keyframes hitShake{0%{transform:translateX(0);filter:brightness(1)}10%{transform:translateX(-5px);filter:brightness(1.5)}20%{transform:translateX(4px);filter:brightness(1.3)}30%{transform:translateX(-3px)}45%{transform:translateX(3px);filter:brightness(1.1)}60%{transform:translateX(-2px)}80%{transform:translateX(1px)}100%{transform:translateX(0);filter:brightness(1)}}
 @keyframes healGlow{0%{box-shadow:0 0 0 rgba(46,204,113,0)}50%{box-shadow:0 0 15px rgba(46,204,113,.5)}100%{box-shadow:0 0 0 rgba(46,204,113,0)}}
 @keyframes shieldFlash{0%{box-shadow:0 0 0 rgba(52,152,219,0)}50%{box-shadow:0 0 20px rgba(52,152,219,.6)}100%{box-shadow:0 0 0 rgba(52,152,219,0)}}
-@keyframes deathFade{0%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.05);filter:grayscale(.5) brightness(1.5)}100%{opacity:.3;transform:scale(.92);filter:grayscale(1) brightness(.5)}}
+@keyframes deathFade{0%{opacity:1;transform:scale(1);filter:none}30%{opacity:.8;transform:scale(1.08);filter:brightness(2) saturate(0)}60%{opacity:.4;transform:scale(.95);filter:grayscale(.8) brightness(1.2)}100%{opacity:.25;transform:scale(.9);filter:grayscale(1) brightness(.4)}}
 .battle-unit.dying{animation:deathFade .6s ease forwards}
 /* 暴击特效 */
-@keyframes critFlash{0%{box-shadow:0 0 0 0 rgba(255,200,0,.8)}50%{box-shadow:0 0 25px 5px rgba(255,150,0,.9)}100%{box-shadow:0 0 0 0 rgba(255,200,0,0)}}
+@keyframes critFlash{0%{box-shadow:0 0 0 0 rgba(255,200,0,.8)}50%{box-shadow:0 0 30px 8px rgba(255,150,0,.9),inset 0 0 15px rgba(255,200,0,.3)}100%{box-shadow:0 0 0 0 rgba(255,200,0,0)}}
 .battle-unit.crit-hit{animation:critFlash .5s ease}
 /* 连胜特效 */
 @keyframes streakPulse{0%,100%{border-color:var(--gold)}50%{border-color:#ff6b00}}
@@ -151,7 +151,12 @@ body{background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingF
 
 /* 浮动伤害数字 */
 .float-num{position:absolute;font-weight:900;font-size:14px;pointer-events:none;z-index:100;animation:floatUp 1s ease-out forwards;text-shadow:0 2px 4px rgba(0,0,0,.8);white-space:nowrap;left:50%;transform:translateX(-50%)}
-.float-num.damage{color:#ff4757}.float-num.crit{color:#ffd32a;font-size:18px;text-shadow:0 0 8px rgba(255,211,42,.6)}
+.float-num.damage{color:#ff4757}.float-num.crit{color:#ffd32a;font-size:22px;text-shadow:0 0 12px rgba(255,211,42,.8),0 0 24px rgba(255,150,0,.4);animation:critFloat .8s ease-out forwards}
+@keyframes critFloat{0%{opacity:1;top:10%;transform:translateX(-50%) scale(.5)}15%{opacity:1;transform:translateX(-50%) scale(1.4)}30%{transform:translateX(-50%) scale(1)}100%{opacity:0;top:-30%;transform:translateX(-50%) scale(.8)}}
+.float-num.combo-text{color:#ff6348;font-size:16px;font-weight:900;text-shadow:0 0 10px rgba(255,99,72,.6);animation:comboFloat .7s ease-out forwards}
+@keyframes comboFloat{0%{opacity:1;top:5%;transform:translateX(-50%) scale(.6)}20%{opacity:1;transform:translateX(-50%) scale(1.2)}100%{opacity:0;top:-20%;transform:translateX(-50%) scale(.9)}}
+.float-num.kill-text{color:#ff4757;font-size:20px;font-weight:900;text-shadow:0 0 15px rgba(255,71,87,.8);animation:killFloat 1s ease-out forwards}
+@keyframes killFloat{0%{opacity:1;top:0%;transform:translateX(-50%) scale(.3)}25%{opacity:1;transform:translateX(-50%) scale(1.5)}50%{transform:translateX(-50%) scale(1.1)}100%{opacity:0;top:-35%;transform:translateX(-50%) scale(.7)}}
 .float-num.heal{color:#2ed573}.float-num.shield-num{color:#54a0ff}
 .float-num.dodge{color:#a4b0be;font-size:11px;font-style:italic}
 .float-num.miss{color:#636e72;font-size:11px}
@@ -162,8 +167,17 @@ body{background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingF
 
 /* 技能全屏特效 */
 .skill-effect-overlay{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:50;display:flex;align-items:center;justify-content:center}
-.skill-effect-text{font-size:18px;font-weight:900;animation:skillFlash .8s ease-out forwards;text-shadow:0 0 20px currentColor}
-@keyframes skillFlash{0%{opacity:0;transform:scale(.5)}20%{opacity:1;transform:scale(1.2)}40%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(1.1)}}
+.skill-effect-bg{position:absolute;top:0;left:0;right:0;bottom:0;opacity:0;animation:skillBgFlash .6s ease-out forwards}
+@keyframes skillBgFlash{0%{opacity:0}15%{opacity:.15}100%{opacity:0}}
+.skill-effect-overlay.fire .skill-effect-bg{background:radial-gradient(ellipse at center,rgba(255,99,72,.5),transparent 70%)}
+.skill-effect-overlay.ice .skill-effect-bg{background:radial-gradient(ellipse at center,rgba(116,185,255,.5),transparent 70%)}
+.skill-effect-overlay.dark .skill-effect-bg{background:radial-gradient(ellipse at center,rgba(108,92,231,.5),transparent 70%)}
+.skill-effect-overlay.holy .skill-effect-bg{background:radial-gradient(ellipse at center,rgba(255,234,167,.5),transparent 70%)}
+.skill-effect-overlay.poison .skill-effect-bg{background:radial-gradient(ellipse at center,rgba(0,184,148,.5),transparent 70%)}
+.skill-effect-overlay.heal-effect .skill-effect-bg{background:radial-gradient(ellipse at center,rgba(85,239,196,.4),transparent 70%)}
+.skill-effect-overlay.shield-effect .skill-effect-bg{background:radial-gradient(ellipse at center,rgba(116,185,255,.4),transparent 70%)}
+.skill-effect-text{font-size:20px;font-weight:900;animation:skillFlash .8s ease-out forwards;text-shadow:0 0 20px currentColor,0 2px 8px rgba(0,0,0,.8);position:relative;z-index:1}
+@keyframes skillFlash{0%{opacity:0;transform:scale(.3) translateY(10px)}15%{opacity:1;transform:scale(1.3) translateY(-5px)}30%{transform:scale(1) translateY(0)}75%{opacity:1}100%{opacity:0;transform:scale(1.05) translateY(-10px)}}
 .skill-effect-overlay.fire .skill-effect-text{color:#ff6348}
 .skill-effect-overlay.ice .skill-effect-text{color:#74b9ff}
 .skill-effect-overlay.dark .skill-effect-text{color:#6c5ce7}
@@ -2723,7 +2737,7 @@ function updatePauseButton(){
 }
 function getUnitEl(unit){var uid=unit.name+'-'+unit.icon;return document.querySelector('[data-battle-uid="'+uid+'"]')}
 function showFloat(unit,text,cls){var el=getUnitEl(unit);if(!el)return;var num=document.createElement('div');num.className='float-num '+(cls||'');num.textContent=text;el.appendChild(num);setTimeout(function(){if(num.parentNode)num.parentNode.removeChild(num)},1100)}
-function showSkillEffect(skillIcon,skillName,elementClass){if(!_battleScene)return;var overlay=document.createElement('div');overlay.className='skill-effect-overlay '+(elementClass||'');overlay.innerHTML='<div class="skill-effect-text">'+skillIcon+' '+skillName+'</div>';_battleScene.appendChild(overlay);setTimeout(function(){if(overlay.parentNode)overlay.parentNode.removeChild(overlay)},900)}
+function showSkillEffect(skillIcon,skillName,elementClass){if(!_battleScene)return;var overlay=document.createElement('div');overlay.className='skill-effect-overlay '+(elementClass||'');overlay.innerHTML='<div class="skill-effect-bg"></div><div class="skill-effect-text">'+skillIcon+' '+skillName+'</div>';_battleScene.appendChild(overlay);setTimeout(function(){if(overlay.parentNode)overlay.parentNode.removeChild(overlay)},900)}
 function animUnit(unit,cls,duration){var el=getUnitEl(unit);if(!el)return;el.classList.add(cls);setTimeout(function(){el.classList.remove(cls)},duration||400)}
 function highlightUnit(unit){document.querySelectorAll('.battle-unit.acting').forEach(function(el){el.classList.remove('acting')});var el=getUnitEl(unit);if(el)el.classList.add('acting')}
 function clearHighlight(){document.querySelectorAll('.battle-unit.acting').forEach(function(el){el.classList.remove('acting')})}
