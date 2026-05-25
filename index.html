@@ -1217,6 +1217,17 @@ function loadGame(){
     if(G.pveMaxStreak===undefined) G.pveMaxStreak=0;
     // 初始化背包
     if(!G.inventory) G.inventory={};
+    // 初始化图鉴系统（兼容旧存档）
+    if(!G.codex) G.codex={heroes:{},equipment:{},monsters:{}};
+    if(!G.exploreStats) G.exploreStats={totalBattles:0,totalEvents:0,totalChests:0,totalShrines:0};
+    // 初始化离线收益系统
+    if(!G.lastOnlineTime) G.lastOnlineTime=Date.now();
+    G.offlineEarnings=null;
+    // 初始化商店建筑（兼容旧存档）
+    if(!G.buildings) G.buildings={tavern:1,farm:1,mine:0,blacksmith:0,temple:0,arena:0,shop:0};
+    if(G.buildings.shop===undefined) G.buildings.shop=0;
+    // 初始化金手指
+    if(!G.cheats) G.cheats={unlocked:false,enabled:false};
     return true;
   }catch(e){console.error('读档失败',e);return false;}
 }
@@ -5287,6 +5298,9 @@ function updateCheatPanel(){
 
 // ==================== 初始化 ====================
 function initGame(){
+  // 安全重置：确保战斗状态不会残留
+  G_battleRunning=false;
+  G_autoBattle=false;
   // 尝试读档
   if(loadGame()){
     updateResUI();
