@@ -95,16 +95,6 @@ body{background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingF
 .town-module-btn-info{font-size:10px;color:var(--text2);margin-top:2px}
 .town-quick-btns{display:flex;gap:6px;flex-wrap:wrap}
 
-
-/* ===== 自动推图状态 ===== */
-.auto-battle-status{background:linear-gradient(135deg,rgba(39,174,96,.15),rgba(46,204,113,.1));border:1px solid rgba(39,174,96,.3);border-radius:8px;padding:12px;margin-bottom:12px}
-.auto-battle-status.running{background:linear-gradient(135deg,rgba(241,196,15,.15),rgba(243,156,18,.1));border-color:rgba(241,196,15,.3)}
-.auto-battle-status.failed{background:linear-gradient(135deg,rgba(231,76,60,.15),rgba(192,57,43,.1));border-color:rgba(231,76,60,.3)}
-.auto-battle-status-title{font-size:14px;font-weight:bold;color:var(--gold);margin-bottom:6px;display:flex;align-items:center;gap:6px}
-.auto-battle-status-text{font-size:12px;color:var(--text2)}
-.auto-battle-spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(241,196,15,.3);border-top-color:#f1c40f;border-radius:50%;animation:spin 1s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-
 /* ===== 英雄卡片 ===== */
 .hero-card{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;cursor:pointer;transition:all .25s ease;display:flex;gap:10px;position:relative;overflow:hidden}
 .hero-card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;opacity:0;transition:opacity .25s}
@@ -3221,16 +3211,9 @@ async function runBattle(stageId){
         startBattle(G_currentStageId);
       },1500/G_battleSpeed);
     }else if(G_autoBattle&&!won){
-      // 自动推图失败：停止自动推图，显示失败状态
+      // 自动推图失败：停止自动推图，不切回战斗页
       G_battleRunning=false;
       G_autoBattle=false;
-      openModal('<div class="panel" style="text-align:center;max-width:300px">'
-        +'<div style="font-size:48px;margin-bottom:12px">💀</div>'
-        +'<div style="font-size:16px;font-weight:bold;color:#e74c3c;margin-bottom:8px">自动推图失败！</div>'
-        +'<div style="color:var(--text2);font-size:12px;margin-bottom:8px">倒在了第 '+G_currentStageId+' 关</div>'
-        +'<div style="color:var(--gold);font-size:14px;margin-bottom:16px">连胜 '+G_autoBattleWins+' 关</div>'
-        +'<button class="btn btn-primary" onclick="closeModal();renderCurrentTab()">确定</button>'
-        +'</div>');
       showToast('💀 自动推图失败！关卡 '+G_currentStageId);
     }else{
       G_battleRunning=false;
@@ -4009,19 +3992,13 @@ function renderTown(el){
         +'<div class="town-hero-summary-item"><div class="town-hero-summary-val">'+(G.stageProgress-1)+'</div><div class="town-hero-summary-lbl">关卡</div></div>'
       +'</div>'
     +'</div>'
-    +(G_autoBattle
-      ?'<div class="auto-battle-status running">'
-        +'<div class="auto-battle-status-title"><span class="auto-battle-spinner"></span> 自动推图进行中</div>'
-        +'<div class="auto-battle-status-text">当前第 '+G_currentStageId+' 关 | 已连胜 '+G_autoBattleWins+' 关</div>'
-        +'<button class="btn" style="margin-top:8px;width:100%" onclick="stopAutoBattle()">⏹️ 停止推图</button>'
+    +'<div class="panel">'
+      +'<div class="panel-title"><span class="icon">⚔️</span> 快速入口</div>'
+      +'<div class="town-quick-btns">'
+        +'<button class="btn btn-primary" style="flex:1" onclick="startAutoBattle(G.stageProgress)">▶️ 自动推图</button>'
+        +'<button class="btn" style="flex:1" onclick="renderTavernRecruit()">🍺 招募</button>'
       +'</div>'
-      :'<div class="panel">'
-        +'<div class="panel-title"><span class="icon">⚔️</span> 快速入口</div>'
-        +'<div class="town-quick-btns">'
-          +'<button class="btn btn-primary" style="flex:1" onclick="startAutoBattle(G.stageProgress)">▶️ 自动推图</button>'
-          +'<button class="btn" style="flex:1" onclick="renderTavernRecruit()">🍺 招募</button>'
-        +'</div>'
-      +'</div>')
+    +'</div>'
     +'<div class="grid-2">'
       +'<div class="town-module-btn" onclick="switchTab(\'heroes\')">'
         +'<div class="town-module-btn-icon">⚔️</div>'
@@ -4482,31 +4459,9 @@ function hideBattlePanel(){
 }
 
 function startAutoBattle(fromStage){
-  if(G_autoBattle){
-    showToast('⚠️ 自动推图已在进行中');
-    return;
-  }
-  if(G_battleRunning){
-    showToast('⚠️ 当前有战斗进行中');
-    return;
-  }
   G_autoBattle=true;
-  G_autoBattleStartStage=fromStage||G.stageProgress;
-  G_currentStageId=G_autoBattleStartStage;
-  G_autoBattleWins=0;
-  showToast('🚀 自动推图开始！从第 '+G_currentStageId+' 关开始');
-  renderCurrentTab(); // 刷新界面显示状态
+  G_currentStageId=fromStage||G.stageProgress;
   startBattle(G_currentStageId);
-}
-
-
-// 停止自动推图
-function stopAutoBattle(){
-  if(!G_autoBattle) return;
-  G_autoBattle=false;
-  G_battleRunning=false;
-  showToast('⏹️ 自动推图已停止');
-  renderCurrentTab();
 }
 
 function startBattle(stageId){
@@ -5576,4 +5531,5 @@ if(window.location.hash==='#autobattle'){setTimeout(function(){startBattle(1)},8
 </script>
 </body>
 </html>
+
 
