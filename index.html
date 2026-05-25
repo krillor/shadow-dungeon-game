@@ -214,6 +214,15 @@ body{background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingF
 .stage-node.locked{opacity:.3;cursor:not-allowed}
 .stage-node .stage-icon{font-size:16px}
 
+/* 商店 */
+.shop-item{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin:3px 0;display:flex;align-items:center;gap:10px;font-size:12px}
+.shop-item:active{border-color:var(--gold)}
+.shop-item.quality-rare{border-color:rgba(50,100,200,.5)}
+.shop-item.quality-epic{border-color:rgba(130,50,200,.5)}
+.shop-item-icon{font-size:24px;flex-shrink:0}
+.shop-item-info{flex:1}
+.shop-item-name{font-weight:bold}
+
 /* 装备 */
 .equip-slot{background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:5px 8px;margin:3px 0;display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer}
 .equip-slot:active{border-color:var(--gold)}
@@ -274,6 +283,7 @@ body{background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingF
     <div class="nav-btn" data-tab="equip" title="装备">🗡️<div class="nav-label">装备</div></div>
     <div class="nav-btn" data-tab="buildings" title="建筑">🏗️<div class="nav-label">建筑</div></div>
     <div class="nav-btn" data-tab="arena" title="竞技场">🏟️<div class="nav-label">竞技场</div></div>
+    <div class="nav-btn" data-tab="shop" title="商店">🏪<div class="nav-label">商店</div></div>
     <div class="nav-btn" data-tab="codex" title="图鉴">📖<div class="nav-label">图鉴</div></div>
     <div class="nav-btn" data-tab="cheats" id="nav-cheats-btn" title="金手指" style="color:#c0392b">🔓<div class="nav-label">金手指</div></div>
   </div>
@@ -888,7 +898,207 @@ const BUILDING_DEFS = {
     baseCost:{gold:200, stone:30},
     effects:['每日2次挑战','每日3次挑战','每日5次挑战+声望奖励']
   },
+  shop:      {
+    name:'商店', icon:'🏪',
+    desc:'购买各种道具和资源',
+    maxLevel:3,
+    baseCost:{gold:300, stone:50},
+    effects:['基础商店','中级商品+稀有道具','高级商品+神话碎片']
+  },
 };
+
+// ==================== 商店系统 ====================
+const SHOP_ITEMS = {
+  // 基础资源（Lv.1商店解锁）
+  resources: [
+    {id:'gold_pack_s',  name:'金币袋(小)',  icon:'💰', desc:'1000金币', cost:{gold:0,gems:1}, give:{gold:1000}},
+    {id:'gold_pack_m',  name:'金币袋(中)',  icon:'💰', desc:'5000金币', cost:{gold:0,gems:4}, give:{gold:5000}},
+    {id:'food_pack',    name:'食物补给包',   icon:'🍞', desc:'500食物', cost:{gold:100}, give:{food:500}},
+    {id:'stone_pack',   name:'石材包',       icon:'🪨', desc:'300石材', cost:{gold:200}, give:{stone:300}},
+    {id:'iron_pack',    name:'铁矿包',       icon:'⛏️', desc:'150铁矿', cost:{gold:300}, give:{iron:150}},
+  ],
+  // 道具（Lv.1商店解锁）
+  items: [
+    {id:'exp_potion_s',  name:'经验药水(小)',  icon:'🧪', desc:'使用后获得500经验', cost:{gold:50}, give:{exp:500}},
+    {id:'exp_potion_m',  name:'经验药水(中)',  icon:'🧪', desc:'使用后获得2000经验', cost:{gems:2}, give:{exp:2000}},
+    {id:'revive_charm',  name:'复活护符',      icon:'✨', desc:'商店购买，可直接使用复活英雄', cost:{gems:5}, give:{item:'revive_charm',count:1}},
+  ],
+  // 稀有道具（Lv.2商店解锁）
+  rare: [
+    {id:'exp_potion_l',  name:'经验药水(大)',  icon:'🧪', desc:'使用后获得10000经验', cost:{gems:8}, give:{exp:10000}},
+    {id:'random_equip',  name:'随机装备礼盒',  icon:'🎁', desc:'随机获得一件装备', cost:{gems:10}, give:{item:'random_equip',count:1}},
+    {id:'refresh_free',   name:'免费刷新卷轴',  icon:'📜', desc:'酒馆免费刷新一次', cost:{gems:3}, give:{item:'refresh_free',count:1}},
+  ],
+  // 高级道具（Lv.3商店解锁）
+  epic: [
+    {id:'mythic_shard',  name:'神话碎片',       icon:'💎', desc:'集齐10个可兑换神话英雄', cost:{gems:30}, give:{item:'mythic_shard',count:1}},
+    {id:'hero_box_rare', name:'稀有英雄礼盒',    icon:'🎁', desc:'必定获得稀有及以上英雄', cost:{gems:20}, give:{item:'hero_box_rare',count:1}},
+    {id:'enhance_stone', name:'强化石',          icon:'💠', desc:'装备强化额外+1级', cost:{gems:15}, give:{item:'enhance_stone',count:1}},
+  ],
+};
+
+// 玩家背包中的道具
+if(!G.inventory) G.inventory={};
+
+function buyShopItem(itemId){
+  var allItems=[...SHOP_ITEMS.resources,...SHOP_ITEMS.items,...SHOP_ITEMS.rare,...SHOP_ITEMS.epic];
+  var item=allItems.find(function(i){return i.id===itemId});
+  if(!item){showToast('商品不存在！');return}
+  
+  var shopLevel=G.buildings.shop||0;
+  if(shopLevel<1 && SHOP_ITEMS.resources.indexOf(item)===-1 && SHOP_ITEMS.items.indexOf(item)===-1){
+    showToast('需要先建造商店！');return
+  }
+  if(shopLevel<2 && (SHOP_ITEMS.rare.indexOf(item)!==-1 || SHOP_ITEMS.epic.indexOf(item)!==-1)){
+    showToast('需要Lv.2商店！');return
+  }
+  if(shopLevel<3 && SHOP_ITEMS.epic.indexOf(item)!==-1){
+    showToast('需要Lv.3商店！');return
+  }
+  
+  // 检查金币是否足够
+  var costKeys=Object.keys(item.cost||{});
+  for(var i=0;i<costKeys.length;i++){
+    var k=costKeys[i];
+    if(k==='gems'){
+      if((G.resources.gems||0)<item.cost[k]){
+        showToast('💎宝石不足！需要 '+item.cost[k]+' 💎');
+        return;
+      }
+    }else{
+      if((G.resources[k]||0)<item.cost[k]){
+        showToast('💰金币不足！需要 '+item.cost[k]+' 💰');
+        return;
+      }
+    }
+  }
+  
+  // 扣除费用
+  for(var j=0;j<costKeys.length;j++){
+    var ck=costKeys[j];
+    G.resources[ck]-=item.cost[ck];
+  }
+  
+  // 给予物品
+  if(item.give.gold){
+    G.resources.gold=Math.min((G.resources.gold||0)+item.give.gold,RESOURCE_LIMITS.gold);
+    showToast('购买成功！获得 💰'+item.give.gold);
+  }else if(item.give.food){
+    G.resources.food=Math.min((G.resources.food||0)+item.give.food,RESOURCE_LIMITS.food);
+    showToast('购买成功！获得 🍞'+item.give.food);
+  }else if(item.give.stone){
+    G.resources.stone=Math.min((G.resources.stone||0)+item.give.stone,RESOURCE_LIMITS.stone);
+    showToast('购买成功！获得 🪨'+item.give.stone);
+  }else if(item.give.iron){
+    G.resources.iron=Math.min((G.resources.iron||0)+item.give.iron,RESOURCE_LIMITS.iron);
+    showToast('购买成功！获得 ⛏️'+item.give.iron);
+  }else if(item.give.exp){
+    // 直接给经验：随机一个队伍英雄
+    var h=G.heroes.find(function(x){return G.team.some(function(t){return t&&t.uid===x.uid})});
+    if(h){
+      addHeroExp(h,item.give.exp);
+      showToast('购买成功！'+h.name+' 获得 '+item.give.exp+' 经验！');
+    }else{
+      showToast('购买成功！但队伍没有英雄');
+    }
+  }else if(item.give.item){
+    if(!G.inventory[item.give.item]) G.inventory[item.give.item]=0;
+    G.inventory[item.give.item]+=item.give.count;
+    showToast('购买成功！获得 '+item.name);
+  }
+  
+  saveGame();
+  updateResUI();
+  renderCurrentTab();
+}
+
+function renderShop(el){
+  var shopLevel=G.buildings.shop||0;
+  var canBuyResources=shopLevel>=1;
+  var canBuyRare=shopLevel>=2;
+  var canBuyEpic=shopLevel>=3;
+  
+  var resourcesHTML=SHOP_ITEMS.resources.map(function(item){
+    var costStr=Object.entries(item.cost).map(function(kv){
+      return(kv[0]==='gems'?'💎':'💰')+kv[1];
+    }).join(' ');
+    return '<div class="shop-item">'
+      +'<div class="shop-item-icon">'+item.icon+'</div>'
+      +'<div class="shop-item-info">'
+      +'<div class="shop-item-name">'+item.name+'</div>'
+      +'<div class="text-xs text-dim">'+item.desc+'</div>'
+      +'</div>'
+      +'<button class="btn btn-sm" onclick="buyShopItem(\''+item.id+'\')" style="min-width:60px">'+costStr+'</button>'
+      +'</div>';
+  }).join('');
+  
+  var itemsHTML=SHOP_ITEMS.items.map(function(item){
+    var costStr=Object.entries(item.cost).map(function(kv){
+      return(kv[0]==='gems'?'💎':'💰')+kv[1];
+    }).join(' ');
+    var count=G.inventory[item.id]||0;
+    return '<div class="shop-item">'
+      +'<div class="shop-item-icon">'+item.icon+'</div>'
+      +'<div class="shop-item-info">'
+      +'<div class="shop-item-name">'+item.name+(count>0?' <span class="text-green">('+count+')</span>':'')+'</div>'
+      +'<div class="text-xs text-dim">'+item.desc+'</div>'
+      +'</div>'
+      +'<button class="btn btn-sm" onclick="buyShopItem(\''+item.id+'\')" style="min-width:60px">'+costStr+'</button>'
+      +'</div>';
+  }).join('');
+  
+  var rareHTML=canBuyRare?SHOP_ITEMS.rare.map(function(item){
+    var costStr=Object.entries(item.cost).map(function(kv){
+      return(kv[0]==='gems'?'💎':'💰')+kv[1];
+    }).join(' ');
+    var count=G.inventory[item.id]||0;
+    return '<div class="shop-item quality-rare">'
+      +'<div class="shop-item-icon">'+item.icon+'</div>'
+      +'<div class="shop-item-info">'
+      +'<div class="shop-item-name">'+item.name+(count>0?' <span class="text-green">('+count+0')</span>':'')+'</div>'
+      +'<div class="text-xs text-dim">'+item.desc+'</div>'
+      +'</div>'
+      +'<button class="btn btn-sm" onclick="buyShopItem(\''+item.id+'\')" style="min-width:60px">'+costStr+'</button>'
+      +'</div>';
+  }).join(''):'<div class="text-dim">需要Lv.2商店解锁</div>';
+  
+  var epicHTML=canBuyEpic?SHOP_ITEMS.epic.map(function(item){
+    var costStr=Object.entries(item.cost).map(function(kv){
+      return(kv[0]==='gems'?'💎':'💰')+kv[1];
+    }).join(' ');
+    var count=G.inventory[item.id]||0;
+    return '<div class="shop-item quality-epic">'
+      +'<div class="shop-item-icon">'+item.icon+'</div>'
+      +'<div class="shop-item-info">'
+      +'<div class="shop-item-name">'+item.name+(count>0?' <span class="text-green">('+count+')</span>':'')+'</div>'
+      +'<div class="text-xs text-dim">'+item.desc+'</div>'
+      +'</div>'
+      +'<button class="btn btn-sm" onclick="buyShopItem(\''+item.id+'\')" style="min-width:60px">'+costStr+'</button>'
+      +'</div>';
+  }).join(''):'<div class="text-dim">需要Lv.3商店解锁</div>';
+  
+  el.innerHTML='<div class="panel">'
+    +'<div class="panel-title"><span class="icon">🏪</span> 商店 <span class="text-blue">Lv.'+shopLevel+'</span></div>'
+    +'<div class="text-dim text-sm mb-8">使用金币或宝石购买各种资源、道具和稀有物品</div>'
+    +(shopLevel===0?'<div style="background:rgba(255,100,100,.1);border:1px solid rgba(255,100,100,.3);border-radius:8px;padding:16px;text-align:center;color:#ff6b6b">商店尚未建造！请在建筑页面建造商店</div>':'')
+    +'</div>'
+    +'<div class="panel">'
+    +'<div class="panel-title">💰 资源区</div>'
+    +'<div style="display:flex;flex-direction:column;gap:6px">'+resourcesHTML+'</div>'
+    +'</div>'
+    +'<div class="panel">'
+    +'<div class="panel-title">🎒 道具区</div>'
+    +'<div style="display:flex;flex-direction:column;gap:6px">'+itemsHTML+'</div>'
+    +'</div>'
+    +'<div class="panel">'
+    +'<div class="panel-title">⭐ 稀有区 '+(canBuyRare?'<span class="text-xs text-dim">(Lv.2解锁)</span>':'')+'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:6px">'+rareHTML+'</div>'
+    +'</div>'
+    +'<div class="panel">'
+    +'<div class="panel-title">💫 传说区 '+(canBuyEpic?'<span class="text-xs text-dim">(Lv.3解锁)</span>':'')+'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:6px">'+epicHTML+'</div>'
+    +'</div>';
+}
 
 // 竞技场配置
 const ARENA_CONFIG = {
@@ -931,7 +1141,7 @@ let G = {
   heroes: [],
   team: [null,null,null,null,null,null],
   equipment: [],
-  buildings: {tavern:1, farm:1, mine:0, blacksmith:0, temple:0, arena:0},
+  buildings: {tavern:1, farm:1, mine:0, blacksmith:0, temple:0, arena:0, shop:0},
   stageProgress: 1,
   battleState: null,
   heroIdCounter: 0,
@@ -1002,6 +1212,8 @@ function loadGame(){
     // 初始化连胜计数
     if(G.pveWinStreak===undefined) G.pveWinStreak=0;
     if(G.pveMaxStreak===undefined) G.pveMaxStreak=0;
+    // 初始化背包
+    if(!G.inventory) G.inventory={};
     return true;
   }catch(e){console.error('读档失败',e);return false;}
 }
@@ -2131,74 +2343,6 @@ function addHeroExp(hero,amount){
   // 超出上限的经验清零
   if(hero.level>=levelCap)hero.exp=0;
   return leveled;
-}
-
-// ==================== 经验药水购买 ====================
-function buyExpPotion(size){
-  const potions={
-    small:{exp:50,cost:100,name:'小型经验药水'},
-    medium:{exp:200,cost:350,name:'中型经验药水'},
-    large:{exp:1000,cost:1500,name:'大型经验药水'}
-  };
-  const potion=potions[size];
-  if(!potion){showToast('未知的药水类型！');return}
-  
-  // 检查金币
-  if((G.resources.gold||0)<potion.cost){
-    showToast('金币不足！需要 💰'+potion.cost);
-    return;
-  }
-  
-  // 检查是否有英雄可以升级
-  if(G.heroes.length===0){
-    showToast('你没有英雄可以升级！');
-    return;
-  }
-  
-  // 扣除金币
-  G.resources.gold-=potion.cost;
-  
-  // 打开英雄选择界面
-  openExpPotionUseModal(potion);
-}
-
-function openExpPotionUseModal(potion){
-  const heroesHTML=G.heroes.map(h=>{
-    const expNeed=getExpToLevel(h.level);
-    const canLevelUp=h.exp+potion.exp>=expNeed && h.level<getHeroLevelCap();
-    return`<div class="hero-card quality-${h.quality}" style="cursor:pointer;${canLevelUp?'border:2px solid var(--green)':''}" onclick="useExpPotionOnHero(${h.uid},${potion.exp});closeModal()">`
-      +`<div class="hero-avatar">${h.icon}</div>`
-      +`<div class="hero-info">`
-      +`<div class="hero-name"><span class="q-${h.quality}">${h.name}</span> ${canLevelUp?'<span class="text-green">↑可升级</span>':''}</div>`
-      +`<div class="hero-meta">Lv.${h.level} · ${ROLES[h.role].name}</div>`
-      +`<div class="text-xs text-dim">EXP: ${h.exp}/${expNeed}</div>`
-      +`<div class="text-xs" style="color:var(--gold)">+${potion.exp} EXP</div>`
-      +`</div></div>`;
-  }).join('');
-  
-  openModal(`<div class="panel" style="max-width:500px">`
-    +`<div style="font-size:16px;font-weight:bold;margin-bottom:12px">🧪 使用${potion.name}</div>`
-    +`<div class="text-dim text-sm mb-8">点击英雄使用药水</div>`
-    +`<div style="display:flex;flex-wrap:wrap;gap:8px">${heroesHTML}</div>`
-    +`<div style="margin-top:16px;text-align:center"><button class="btn" onclick="closeModal()">取消</button></div>`
-    +`</div>`);
-}
-
-function useExpPotionOnHero(heroUid,expAmount){
-  const hero=G.heroes.find(h=>h.uid===heroUid);
-  if(!hero){showToast('英雄不存在！');return}
-  
-  const oldLevel=hero.level;
-  const leveled=addHeroExp(hero,expAmount);
-  
-  if(leveled){
-    showToast(`${hero.icon} ${hero.name} 升级了！Lv.${oldLevel} → Lv.${hero.level}`);
-  }else{
-    showToast(`${hero.icon} ${hero.name} 获得 ${expAmount} 经验`);
-  }
-  
-  saveGame();
-  updateResUI();
 }
 
 // ==================== 战斗引擎 ====================
@@ -3810,6 +3954,7 @@ function renderCurrentTab(){
     case 'equip': renderEquip(contentEl);break;
     case 'buildings': renderBuildings(contentEl);break;
     case 'arena': renderArena(contentEl);break;
+    case 'shop': renderShop(contentEl);break;
     case 'codex': renderCodex(contentEl);break;
     case 'cheats': renderCheats(contentEl);break;
   }
@@ -3892,15 +4037,6 @@ function renderTown(el){
       <div class="text-dim text-sm mb-8">在酒馆招募新英雄（品质受酒馆等级影响）</div>
       <div class="btn-group">
         <button class="btn btn-primary" onclick="renderTavernRecruit()">🍺 前往酒馆</button>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="panel-title"><span class="icon">🧪</span> 经验药水商店</div>
-      <div class="text-dim text-sm mb-8">使用金币购买经验药水，快速提升英雄等级</div>
-      <div class="btn-group">
-        <button class="btn" onclick="buyExpPotion('small')">🧪 小型药水 (+50exp) 💰100</button>
-        <button class="btn" onclick="buyExpPotion('medium')">🧪 中型药水 (+200exp) 💰350</button>
-        <button class="btn" onclick="buyExpPotion('large')">🧪 大型药水 (+1000exp) 💰1500</button>
       </div>
     </div>
     <div class="panel">
